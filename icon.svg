@@ -1,0 +1,81 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none"
+  xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="0.5" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+
+    <!-- Soft shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-opacity="0.25"/>
+    </filter>
+
+    <!-- Inner highlight -->
+    <linearGradient id="cardGrad" x1="140" y1="130" x2="370" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="white" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <!-- Check gradient -->
+    <linearGradient id="checkGrad" x1="170" y1="230" x2="260" y2="310" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10B981"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+
+    <!-- Recurring gradient -->
+    <linearGradient id="syncGrad" x1="250" y1="240" x2="370" y2="350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="32" y="32" width="448" height="448" rx="110" fill="url(#bg)"/>
+
+  <!-- Card panel -->
+  <g filter="url(#shadow)">
+    <rect x="120" y="120" width="272" height="272" rx="64" fill="url(#cardGrad)"/>
+  </g>
+
+  <!-- Checkbox + checkmark -->
+  <rect x="160" y="190" width="74" height="74" rx="18" fill="url(#checkGrad)"/>
+  <path d="M177 228 L193 244 L220 214"
+        stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Checklist lines -->
+  <rect x="250" y="204" width="112" height="18" rx="9" fill="#111827" fill-opacity="0.75"/>
+  <rect x="250" y="240" width="90" height="14" rx="7" fill="#111827" fill-opacity="0.45"/>
+
+  <!-- Recurring / sync symbol -->
+  <g transform="scale(0.6) translate(180, 230) ">
+  <path d="M286 310
+           C286 276 312 252 346 252
+           C368 252 386 264 396 281"
+        stroke="url(#syncGrad)" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M402 265 L404 292 L378 284"
+        fill="url(#syncGrad)"/>
+
+  <path d="M406 310
+           C406 344 380 368 346 368
+           C324 368 306 356 296 339"
+        stroke="url(#syncGrad)" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M290 355 L288 328 L314 336"
+        fill="url(#syncGrad)"/>
+</g>
+  <!-- Collaboration hint: two user dots -->
+  <circle cx="180" cy="322" r="16" fill="#111827" fill-opacity="0.7"/>
+  <circle cx="212" cy="338" r="12" fill="#111827" fill-opacity="0.5"/>
+
+  <!-- subtle gloss overlay -->
+  <path d="M64 160
+           C120 80 220 52 320 72
+           C380 84 420 110 448 148
+           C420 70 356 32 256 32
+           C140 32 74 90 64 160Z"
+        fill="white" fill-opacity="0.12"/>
+
+</svg>

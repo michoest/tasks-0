@@ -1,0 +1,33 @@
+<svg width="32" height="32" viewBox="0 0 512 512" fill="none"
+  xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="0.5" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+
+    <!-- Check gradient -->
+    <linearGradient id="checkGrad" x1="170" y1="230" x2="260" y2="310" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10B981"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="32" y="32" width="448" height="448" rx="110" fill="url(#bg)"/>
+
+  <!-- Card panel -->
+  <rect x="120" y="120" width="272" height="272" rx="64" fill="white" fill-opacity="0.9"/>
+
+  <!-- Checkbox + checkmark -->
+  <rect x="160" y="190" width="74" height="74" rx="18" fill="url(#checkGrad)"/>
+  <path d="M177 228 L193 244 L220 214"
+        stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Checklist lines -->
+  <rect x="250" y="204" width="112" height="18" rx="9" fill="#111827" fill-opacity="0.75"/>
+  <rect x="250" y="240" width="90" height="14" rx="7" fill="#111827" fill-opacity="0.45"/>
+</svg>

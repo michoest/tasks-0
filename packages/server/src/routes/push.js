@@ -95,8 +95,13 @@ router.post('/test', requireAuth, (req, res) => {
 
       return webPush.sendNotification(pushSubscription, payload).catch(error => {
         console.error('Push send error:', error);
-        // If subscription is invalid, remove it
-        if (error.statusCode === 410) {
+        // If subscription is invalid or expired, remove it
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(sub.id);
+        }
+        // If JWT token is bad (403), the subscription was created with different VAPID keys
+        if (error.statusCode === 403) {
+          console.error('BadJwtToken error - subscription may have been created with different VAPID keys');
           db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(sub.id);
         }
         throw error;
@@ -109,7 +114,12 @@ router.post('/test', requireAuth, (req, res) => {
       })
       .catch(error => {
         console.error('Test notification error:', error);
-        res.status(500).json({ error: error.message });
+        // Provide more helpful error message
+        let errorMsg = error.message;
+        if (error.body && error.body.includes('BadJwtToken')) {
+          errorMsg = 'Push-Abonnement ungültig. Bitte Push deaktivieren und erneut aktivieren.';
+        }
+        res.status(500).json({ error: errorMsg, details: error.body });
       });
   } catch (error) {
     console.error('Test notification error:', error);

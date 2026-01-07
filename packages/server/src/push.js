@@ -3,8 +3,13 @@ import { db } from './db.js';
 
 // Configure VAPID details
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  // Ensure mailto: prefix is present
+  let vapidEmail = process.env.VAPID_EMAIL || 'mail@example.com';
+  if (!vapidEmail.startsWith('mailto:')) {
+    vapidEmail = `mailto:${vapidEmail}`;
+  }
   webPush.setVapidDetails(
-    process.env.VAPID_EMAIL || 'mailto:mail@michoest.com',
+    vapidEmail,
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );

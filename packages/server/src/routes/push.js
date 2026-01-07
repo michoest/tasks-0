@@ -62,11 +62,12 @@ router.post('/test', requireAuth, (req, res) => {
       return res.status(500).json({ error: 'VAPID keys not configured' });
     }
 
-    webPush.setVapidDetails(
-      `mailto:${process.env.VAPID_EMAIL || 'test@example.com'}`,
-      publicKey,
-      privateKey
-    );
+    // Ensure mailto: prefix is present
+    let vapidEmail = process.env.VAPID_EMAIL || 'test@example.com';
+    if (!vapidEmail.startsWith('mailto:')) {
+      vapidEmail = `mailto:${vapidEmail}`;
+    }
+    webPush.setVapidDetails(vapidEmail, publicKey, privateKey);
 
     // Get user's subscriptions
     const subscriptions = db.prepare(

@@ -20,13 +20,20 @@
               {{ space.personal_name || space.name }}
             </v-chip>
             <v-spacer />
-            <v-btn
-              icon="mdi-filter-variant"
-              size="small"
-              variant="text"
-              :color="hasActiveFilters ? 'primary' : ''"
-              @click="filterDialog = true"
-            />
+            <v-badge
+              :model-value="hasActiveFilters"
+              dot
+              color="primary"
+              offset-x="-2"
+              offset-y="-2"
+            >
+              <v-btn
+                icon="mdi-filter-variant"
+                size="small"
+                variant="text"
+                @click="filterDialog = true"
+              />
+            </v-badge>
           </div>
         </div>
         <!-- Overdue Tasks -->
@@ -940,15 +947,18 @@ async function completeTask(task) {
 
     const res = await api.post(`/spaces/${task.space_id}/tasks/${task.id}/complete`, {});
 
-    // Remove old task or update with next occurrence
-    if (res.task) {
-      // Task has next occurrence, update it
-      if (taskIndex !== -1) {
-        allTasks.value[taskIndex] = { ...res.task, space_id: task.space_id, space_name: task.space_name, space_color: task.space_color };
-      }
-    } else {
-      // Task is one-time, remove it
+    // Remove task if it's one-time or no_date (no next occurrence)
+    // Check if next_due_date is null which means no recurrence
+    const shouldRemove = !res.next_due_date ||
+      res.task?.recurrence_type === 'one_time' ||
+      res.task?.recurrence_type === 'no_date';
+
+    if (shouldRemove) {
+      // Task is completed and won't recur, remove it
       allTasks.value = allTasks.value.filter(t => !(t.space_id === task.space_id && t.id === task.id));
+    } else if (res.task && taskIndex !== -1) {
+      // Task has next occurrence, update it
+      allTasks.value[taskIndex] = { ...res.task, space_id: task.space_id, space_name: task.space_name, space_color: task.space_color };
     }
 
     snackbarMessage.value = `Erledigt: ${task.title}`;

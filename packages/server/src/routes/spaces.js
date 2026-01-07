@@ -83,10 +83,11 @@ router.get('/:id', (req, res) => {
     space.personal_color = membership.personal_color;
 
     const members = db.prepare(`
-      SELECT u.id, u.email, sm.role, sm.joined_at
+      SELECT u.id, u.email, u.first_name, u.last_name, sm.role, sm.joined_at
       FROM users u
       JOIN space_members sm ON sm.user_id = u.id
       WHERE sm.space_id = ?
+      ORDER BY sm.role DESC, sm.joined_at ASC
     `).all(spaceId);
 
     res.json({ space, members });

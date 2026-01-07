@@ -6,6 +6,113 @@ import { calculateNextDue, isOverdue, calculateDaysOverdue, calculateDaysUntilDu
 
 const router = Router({ mergeParams: true });
 
+// Stats routes (these don't require spaceId parameter)
+const statsRouter = Router();
+statsRouter.use(requireAuth);
+
+// Get completions per day for the current user's spaces
+statsRouter.get('/completions-per-day', (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const daysNum = Math.min(parseInt(days) || 30, 365);
+
+    // Get all spaces user is member of
+    const userSpaces = db.prepare(`
+      SELECT space_id FROM space_members WHERE user_id = ?
+    `).all(req.session.userId);
+
+    if (userSpaces.length === 0) {
+      return res.json({ stats: [] });
+    }
+
+    const spaceIds = userSpaces.map(s => s.space_id);
+    const placeholders = spaceIds.map(() => '?').join(',');
+
+    const stats = db.prepare(`
+      SELECT
+        date(c.completed_at) as date,
+        COUNT(*) as count,
+        SUM(CASE WHEN c.skipped = 0 THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN c.skipped = 1 THEN 1 ELSE 0 END) as skipped
+      FROM completions c
+      JOIN tasks t ON c.task_id = t.id
+      WHERE t.space_id IN (${placeholders})
+        AND c.completed_at >= date('now', '-' || ? || ' days')
+      GROUP BY date(c.completed_at)
+      ORDER BY date DESC
+    `).all(...spaceIds, daysNum);
+
+    res.json({ stats });
+  } catch (error) {
+    console.error('Get completions per day error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get task occurrences over time
+statsRouter.get('/task-occurrences', (req, res) => {
+  try {
+    const { days = 90 } = req.query;
+    const daysNum = Math.min(parseInt(days) || 90, 365);
+
+    // Get all spaces user is member of
+    const userSpaces = db.prepare(`
+      SELECT space_id FROM space_members WHERE user_id = ?
+    `).all(req.session.userId);
+
+    if (userSpaces.length === 0) {
+      return res.json({ tasks: [] });
+    }
+
+    const spaceIds = userSpaces.map(s => s.space_id);
+    const placeholders = spaceIds.map(() => '?').join(',');
+
+    // Get all tasks with their completion history
+    const tasks = db.prepare(`
+      SELECT
+        t.id,
+        t.title,
+        t.space_id,
+        s.name as space_name,
+        c.name as category_name,
+        c.color as category_color,
+        c.icon as category_icon,
+        t.recurrence_type
+      FROM tasks t
+      JOIN spaces s ON t.space_id = s.id
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE t.space_id IN (${placeholders})
+        AND t.recurrence_type NOT IN ('inactive', 'one_time')
+      ORDER BY t.title
+    `).all(...spaceIds);
+
+    // Get completions for each task
+    const taskOccurrences = tasks.map(task => {
+      const completions = db.prepare(`
+        SELECT
+          date(completed_at) as date,
+          skipped
+        FROM completions
+        WHERE task_id = ?
+          AND completed_at >= date('now', '-' || ? || ' days')
+        ORDER BY completed_at DESC
+      `).all(task.id, daysNum);
+
+      return {
+        ...task,
+        completions
+      };
+    });
+
+    res.json({ tasks: taskOccurrences });
+  } catch (error) {
+    console.error('Get task occurrences error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export { statsRouter };
+
 // All routes require authentication
 router.use(requireAuth);
 

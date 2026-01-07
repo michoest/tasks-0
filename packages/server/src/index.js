@@ -9,7 +9,7 @@ import authRoutes from './routes/auth.js';
 import spacesRoutes from './routes/spaces.js';
 import usersRoutes from './routes/users.js';
 import categoriesRoutes from './routes/categories.js';
-import tasksRoutes from './routes/tasks.js';
+import tasksRoutes, { statsRouter } from './routes/tasks.js';
 import pushRoutes from './routes/push.js';
 import sseRoutes from './routes/sse.js';
 
@@ -40,6 +40,7 @@ app.use('/api/spaces', spacesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/spaces/:spaceId/categories', categoriesRoutes);
 app.use('/api/spaces/:spaceId/tasks', tasksRoutes);
+app.use('/api/stats', statsRouter);
 app.use('/api/push', pushRoutes);
 app.use('/api/sse', sseRoutes);
 

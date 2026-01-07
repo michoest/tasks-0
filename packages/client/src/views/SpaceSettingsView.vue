@@ -103,6 +103,71 @@
           </v-card>
         </div>
 
+        <!-- Members Section (Owner only) -->
+        <div v-if="isOwner" class="mb-6">
+          <div class="d-flex align-center mb-3">
+            <h2 class="text-h6 font-weight-bold">Mitglieder</h2>
+            <v-chip size="small" class="ml-2">{{ members.length }}</v-chip>
+          </div>
+
+          <v-card elevation="0">
+            <v-list class="pa-0">
+              <v-list-item
+                v-for="member in members"
+                :key="member.id"
+              >
+                <template #prepend>
+                  <v-avatar color="primary" size="36">
+                    <span class="text-body-2">{{ getMemberInitials(member) }}</span>
+                  </v-avatar>
+                </template>
+
+                <v-list-item-title>
+                  {{ getMemberDisplayName(member) }}
+                  <v-chip v-if="member.role === 'owner'" size="x-small" color="primary" class="ml-2">
+                    Besitzer
+                  </v-chip>
+                </v-list-item-title>
+                <v-list-item-subtitle>{{ member.email }}</v-list-item-subtitle>
+
+                <template #append>
+                  <span class="text-caption text-medium-emphasis">
+                    {{ formatJoinDate(member.joined_at) }}
+                  </span>
+                </template>
+              </v-list-item>
+            </v-list>
+
+            <v-divider />
+
+            <v-card-text>
+              <div class="text-caption text-medium-emphasis mb-2">Einladungscode</div>
+              <div class="d-flex align-center ga-2">
+                <v-text-field
+                  :model-value="space?.invite_code"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="flex-grow-1"
+                >
+                  <template #append-inner>
+                    <v-btn
+                      icon="mdi-content-copy"
+                      size="small"
+                      variant="text"
+                      @click="copyInviteCode"
+                    />
+                  </template>
+                </v-text-field>
+              </div>
+              <div class="text-caption text-medium-emphasis mt-2">
+                Teile diesen Code, damit andere dem Space beitreten können.
+              </div>
+            </v-card-text>
+          </v-card>
+        </div>
+
         <!-- User-specific Settings Section -->
         <div class="mb-6">
           <h2 class="text-h6 font-weight-bold mb-3">Persönliche Einstellungen</h2>
@@ -273,6 +338,7 @@ const spaceId = route.params.id;
 const loading = ref(true);
 const space = ref(null);
 const categories = ref([]);
+const members = ref([]);
 const spaceName = ref('');
 const personalName = ref('');
 const personalColor = ref('');
@@ -357,6 +423,7 @@ async function loadSpace() {
   try {
     const res = await api.get(`/spaces/${spaceId}`);
     space.value = res.space;
+    members.value = res.members || [];
     spaceName.value = res.space.name;
     // Load personal settings if they exist
     personalName.value = res.space.personal_name || '';
@@ -366,6 +433,45 @@ async function loadSpace() {
     }
   } catch (error) {
     console.error('Failed to load space:', error);
+  }
+}
+
+function getMemberInitials(member) {
+  if (member.first_name && member.last_name) {
+    return `${member.first_name[0]}${member.last_name[0]}`.toUpperCase();
+  }
+  if (member.first_name) {
+    return member.first_name.substring(0, 2).toUpperCase();
+  }
+  return member.email.substring(0, 2).toUpperCase();
+}
+
+function getMemberDisplayName(member) {
+  if (member.first_name && member.last_name) {
+    return `${member.first_name} ${member.last_name}`;
+  }
+  if (member.first_name) {
+    return member.first_name;
+  }
+  return member.email.split('@')[0];
+}
+
+function formatJoinDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return `Beigetreten ${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+}
+
+async function copyInviteCode() {
+  try {
+    await navigator.clipboard.writeText(space.value.invite_code);
+    snackbarMessage.value = 'Code kopiert';
+    snackbarColor.value = 'success';
+    showSnackbar.value = true;
+  } catch (error) {
+    snackbarMessage.value = 'Kopieren fehlgeschlagen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
   }
 }
 

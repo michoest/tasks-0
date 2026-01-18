@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAuth } from '../auth.js';
+import { nanoid } from 'nanoid';
 
 const router = Router();
 
@@ -60,6 +61,40 @@ router.patch('/settings', (req, res) => {
     res.json({ user });
   } catch (error) {
     console.error('Update user settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get API key (for external integrations like Apple Shortcuts)
+router.get('/api-key', (req, res) => {
+  try {
+    const user = db.prepare('SELECT api_key FROM users WHERE id = ?').get(req.session.userId);
+    res.json({ api_key: user.api_key });
+  } catch (error) {
+    console.error('Get API key error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Generate new API key
+router.post('/api-key', (req, res) => {
+  try {
+    const apiKey = nanoid(32);
+    db.prepare('UPDATE users SET api_key = ? WHERE id = ?').run(apiKey, req.session.userId);
+    res.json({ api_key: apiKey });
+  } catch (error) {
+    console.error('Generate API key error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Revoke API key
+router.delete('/api-key', (req, res) => {
+  try {
+    db.prepare('UPDATE users SET api_key = NULL WHERE id = ?').run(req.session.userId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Revoke API key error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

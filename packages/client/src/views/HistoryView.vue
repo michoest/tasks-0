@@ -13,7 +13,7 @@
         <!-- Daily Completion Stats -->
         <v-card class="mb-4" elevation="0">
           <v-card-title class="d-flex align-center">
-            <span class="text-h6">Erledigte Aufgaben</span>
+            <span class="text-h6">Aktivität</span>
             <v-spacer />
             <v-btn-toggle v-model="daysRange" density="compact" mandatory>
               <v-btn :value="7" size="small">7T</v-btn>
@@ -147,7 +147,7 @@ import { api } from '../composables/useApi.js';
 const loading = ref(true);
 const completionStats = ref([]);
 const taskOccurrences = ref([]);
-const daysRange = ref(14);
+const daysRange = ref(7);
 const taskSearch = ref('');
 
 onMounted(async () => {

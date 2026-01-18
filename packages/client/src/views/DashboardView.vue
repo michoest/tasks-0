@@ -14,28 +14,57 @@
             <v-chip v-for="space in spacesStore.spaces" :key="space.id"
               :variant="selectedSpaceIds.includes(space.id) ? 'flat' : 'outlined'"
               :color="selectedSpaceIds.includes(space.id) ? (space.personal_color || 'primary') : ''"
-              @click="toggleSpaceFilter(space.id)"
-              size="small">
+              @click="toggleSpaceFilter(space.id)" size="small">
               <v-icon icon="mdi-folder" size="small" class="mr-1" />
               {{ space.personal_name || space.name }}
             </v-chip>
             <v-spacer />
-            <v-badge
-              :model-value="hasActiveFilters"
-              dot
-              color="primary"
-              offset-x="-2"
-              offset-y="-2"
-            >
-              <v-btn
-                icon="mdi-filter-variant"
-                size="small"
-                variant="text"
-                @click="filterDialog = true"
-              />
+            <v-badge :model-value="hasActiveFilters" dot color="primary" offset-x="-2" offset-y="-2">
+              <v-btn icon="mdi-filter-variant" size="small" variant="text" @click="filterDialog = true" />
             </v-badge>
           </div>
         </div>
+        <!-- Inbox Items (always visible, collapsible, not filterable) -->
+        <div v-if="allInboxItems.length > 0" class="mb-6">
+          <div class="d-flex align-center mb-3 cursor-pointer" @click="inboxExpanded = !inboxExpanded">
+            <v-icon icon="mdi-inbox" color="info" class="mr-2" />
+            <h2 class="text-h6 font-weight-bold text-info">Inbox</h2>
+            <v-chip size="small" color="info" class="ml-2">{{ allInboxItems.length }}</v-chip>
+            <v-spacer />
+            <v-icon :icon="inboxExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" />
+          </div>
+          <v-expand-transition>
+            <v-card v-show="inboxExpanded" elevation="0">
+              <v-list class="pa-0" lines="two">
+                <v-list-item v-for="task in allInboxItems" :key="`${task.space_id}-${task.id}`" class="px-4 py-3">
+                  <template #prepend>
+                    <v-checkbox :model-value="false" @click.stop="completeInboxItem(task)" hide-details color="success"
+                      density="compact" class="mr-2" />
+                  </template>
+
+                  <v-list-item-title class="text-body-1 font-weight-medium">
+                    {{ task.title }}
+                    <v-icon :icon="getInboxTypeIcon(task.inbox_type)" :color="getInboxTypeColor(task.inbox_type)"
+                      size="xs" class="mr-2" />
+                  </v-list-item-title>
+
+                  <v-list-item-subtitle v-if="task.transcript && task.transcript !== task.title"
+                    class="text-caption mt-1">
+                    {{ task.transcript.substring(0, 150) }}{{ task.transcript.length > 150 ? '...' : '' }}
+                  </v-list-item-subtitle>
+
+                  <template #append>
+                    <v-btn icon="mdi-arrow-right-bold" variant="text" size="small" color="primary"
+                      @click.stop="enrichInboxItem(task)" title="Zur Aufgabe machen" />
+                    <v-btn icon="mdi-delete" variant="text" size="small" color="error"
+                      @click.stop="deleteInboxItem(task)" />
+                  </template>
+                </v-list-item>
+              </v-list>
+            </v-card>
+          </v-expand-transition>
+        </div>
+
         <!-- Overdue Tasks -->
         <div v-if="overdueTasks.length > 0" class="mb-6">
           <div class="d-flex align-center mb-3">
@@ -120,12 +149,13 @@
                   {{ task.title }}
                 </v-list-item-title>
 
-                <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
+                <v-list-item-subtitle v-if="task.has_specific_time || task.task_type === 'recurring'"
+                  class="d-flex align-center flex-wrap ga-2 mt-1">
                   <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
                     <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
                     {{ task.time_of_day }}
                   </span>
-                  <span class="d-inline-flex align-center text-caption">
+                  <span v-if="task.task_type === 'recurring'" class="d-inline-flex align-center text-caption">
                     <v-icon icon="mdi-refresh" size="small" class="mr-1" />
                     {{ getRecurrenceText(task) }}
                   </span>
@@ -155,150 +185,150 @@
             <v-icon :icon="upcomingExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" />
           </div>
           <v-expand-transition>
-          <v-card v-show="upcomingExpanded" elevation="0">
-            <v-list class="pa-0" lines="two">
-              <!-- Tomorrow -->
-              <template v-if="tomorrowTasks.length > 0">
-                <v-list-subheader class="px-4">
-                  Morgen
-                  <v-chip size="x-small" class="ml-2">{{ tomorrowTasks.length }}</v-chip>
-                </v-list-subheader>
+            <v-card v-show="upcomingExpanded" elevation="0">
+              <v-list class="pa-0" lines="two">
+                <!-- Tomorrow -->
+                <template v-if="tomorrowTasks.length > 0">
+                  <v-list-subheader class="px-4">
+                    Morgen
+                    <v-chip size="x-small" class="ml-2">{{ tomorrowTasks.length }}</v-chip>
+                  </v-list-subheader>
 
-                <v-list-item v-for="task in tomorrowTasks" :key="`${task.space_id}-${task.id}`"
-                  @click="openTaskSheet(task)" class="px-4 py-3">
-                  <template #prepend>
-                    <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
-                      density="compact" class="mr-4" />
-                  </template>
+                  <v-list-item v-for="task in tomorrowTasks" :key="`${task.space_id}-${task.id}`"
+                    @click="openTaskSheet(task)" class="px-4 py-3">
+                    <template #prepend>
+                      <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
+                        density="compact" class="mr-4" />
+                    </template>
 
-                  <div class="d-flex align-center flex-wrap ga-2 mb-1">
-                    <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
-                      {{ task.space_name }}
-                    </span>
-                    <span v-if="task.category" class="d-inline-flex align-center text-caption">
-                      <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
-                        class="mr-1" />
-                      {{ task.category.name }}
-                    </span>
-                  </div>
+                    <div class="d-flex align-center flex-wrap ga-2 mb-1">
+                      <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
+                        {{ task.space_name }}
+                      </span>
+                      <span v-if="task.category" class="d-inline-flex align-center text-caption">
+                        <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
+                          class="mr-1" />
+                        {{ task.category.name }}
+                      </span>
+                    </div>
 
-                  <v-list-item-title class="text-body-1 font-weight-medium">
-                    {{ task.title }}
-                  </v-list-item-title>
+                    <v-list-item-title class="text-body-1 font-weight-medium">
+                      {{ task.title }}
+                    </v-list-item-title>
 
-                  <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-calendar" size="small" class="mr-1" />
-                      {{ formatDueDate(task) }}
-                    </span>
-                    <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
-                      {{ task.time_of_day }}
-                    </span>
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-refresh" size="small" class="mr-1" />
-                      {{ getRecurrenceText(task) }}
-                    </span>
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </template>
+                    <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-calendar" size="small" class="mr-1" />
+                        {{ formatDueDate(task) }}
+                      </span>
+                      <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
+                        {{ task.time_of_day }}
+                      </span>
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-refresh" size="small" class="mr-1" />
+                        {{ getRecurrenceText(task) }}
+                      </span>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                </template>
 
-              <!-- Next 7 Days -->
-              <template v-if="next7DaysTasks.length > 0">
-                <v-list-subheader class="px-4">
-                  Nächste 7 Tage
-                  <v-chip size="x-small" class="ml-2">{{ next7DaysTasks.length }}</v-chip>
-                </v-list-subheader>
+                <!-- Next 7 Days -->
+                <template v-if="next7DaysTasks.length > 0">
+                  <v-list-subheader class="px-4">
+                    Nächste 7 Tage
+                    <v-chip size="x-small" class="ml-2">{{ next7DaysTasks.length }}</v-chip>
+                  </v-list-subheader>
 
-                <v-list-item v-for="task in next7DaysTasks" :key="`${task.space_id}-${task.id}`"
-                  @click="openTaskSheet(task)" class="px-4 py-3">
-                  <template #prepend>
-                    <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
-                      density="compact" class="mr-4" />
-                  </template>
+                  <v-list-item v-for="task in next7DaysTasks" :key="`${task.space_id}-${task.id}`"
+                    @click="openTaskSheet(task)" class="px-4 py-3">
+                    <template #prepend>
+                      <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
+                        density="compact" class="mr-4" />
+                    </template>
 
-                  <div class="d-flex align-center flex-wrap ga-2 mb-1">
-                    <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
-                      {{ task.space_name }}
-                    </span>
-                    <span v-if="task.category" class="d-inline-flex align-center text-caption">
-                      <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
-                        class="mr-1" />
-                      {{ task.category.name }}
-                    </span>
-                  </div>
+                    <div class="d-flex align-center flex-wrap ga-2 mb-1">
+                      <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
+                        {{ task.space_name }}
+                      </span>
+                      <span v-if="task.category" class="d-inline-flex align-center text-caption">
+                        <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
+                          class="mr-1" />
+                        {{ task.category.name }}
+                      </span>
+                    </div>
 
-                  <v-list-item-title class="text-body-1 font-weight-medium">
-                    {{ task.title }}
-                  </v-list-item-title>
+                    <v-list-item-title class="text-body-1 font-weight-medium">
+                      {{ task.title }}
+                    </v-list-item-title>
 
-                  <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-calendar" size="small" class="mr-1" />
-                      {{ formatDueDate(task) }}
-                    </span>
-                    <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
-                      {{ task.time_of_day }}
-                    </span>
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-refresh" size="small" class="mr-1" />
-                      {{ getRecurrenceText(task) }}
-                    </span>
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </template>
+                    <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-calendar" size="small" class="mr-1" />
+                        {{ formatDueDate(task) }}
+                      </span>
+                      <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
+                        {{ task.time_of_day }}
+                      </span>
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-refresh" size="small" class="mr-1" />
+                        {{ getRecurrenceText(task) }}
+                      </span>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                </template>
 
-              <!-- Later -->
-              <template v-if="laterTasks.length > 0">
-                <v-list-subheader class="px-4">
-                  Später
-                  <v-chip size="x-small" class="ml-2">{{ laterTasks.length }}</v-chip>
-                </v-list-subheader>
+                <!-- Later -->
+                <template v-if="laterTasks.length > 0">
+                  <v-list-subheader class="px-4">
+                    Später
+                    <v-chip size="x-small" class="ml-2">{{ laterTasks.length }}</v-chip>
+                  </v-list-subheader>
 
-                <v-list-item v-for="task in laterTasks" :key="`${task.space_id}-${task.id}`"
-                  @click="openTaskSheet(task)" class="px-4 py-3">
-                  <template #prepend>
-                    <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
-                      density="compact" class="mr-4" />
-                  </template>
+                  <v-list-item v-for="task in laterTasks" :key="`${task.space_id}-${task.id}`"
+                    @click="openTaskSheet(task)" class="px-4 py-3">
+                    <template #prepend>
+                      <v-checkbox :model-value="false" @click.stop="completeTask(task)" hide-details color="success"
+                        density="compact" class="mr-4" />
+                    </template>
 
-                  <div class="d-flex align-center flex-wrap ga-2 mb-1">
-                    <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
-                      {{ task.space_name }}
-                    </span>
-                    <span v-if="task.category" class="d-inline-flex align-center text-caption">
-                      <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
-                        class="mr-1" />
-                      {{ task.category.name }}
-                    </span>
-                  </div>
+                    <div class="d-flex align-center flex-wrap ga-2 mb-1">
+                      <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
+                        {{ task.space_name }}
+                      </span>
+                      <span v-if="task.category" class="d-inline-flex align-center text-caption">
+                        <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
+                          class="mr-1" />
+                        {{ task.category.name }}
+                      </span>
+                    </div>
 
-                  <v-list-item-title class="text-body-1 font-weight-medium">
-                    {{ task.title }}
-                  </v-list-item-title>
+                    <v-list-item-title class="text-body-1 font-weight-medium">
+                      {{ task.title }}
+                    </v-list-item-title>
 
-                  <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-calendar" size="small" class="mr-1" />
-                      {{ formatDueDate(task) }}
-                    </span>
-                    <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
-                      {{ task.time_of_day }}
-                    </span>
-                    <span class="d-inline-flex align-center text-caption">
-                      <v-icon icon="mdi-refresh" size="small" class="mr-1" />
-                      {{ getRecurrenceText(task) }}
-                    </span>
-                  </v-list-item-subtitle>
-                </v-list-item>
-              </template>
-            </v-list>
-          </v-card>
+                    <v-list-item-subtitle class="d-flex align-center flex-wrap ga-2 mt-1">
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-calendar" size="small" class="mr-1" />
+                        {{ formatDueDate(task) }}
+                      </span>
+                      <span v-if="task.has_specific_time" class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
+                        {{ task.time_of_day }}
+                      </span>
+                      <span class="d-inline-flex align-center text-caption">
+                        <v-icon icon="mdi-refresh" size="small" class="mr-1" />
+                        {{ getRecurrenceText(task) }}
+                      </span>
+                    </v-list-item-subtitle>
+                  </v-list-item>
+                </template>
+              </v-list>
+            </v-card>
           </v-expand-transition>
         </div>
 
@@ -312,28 +342,28 @@
             <v-icon :icon="inactiveExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" />
           </div>
           <v-expand-transition>
-          <v-card v-show="inactiveExpanded" elevation="0">
-            <v-list class="pa-0" lines="two">
-              <v-list-item v-for="task in inactiveTasks" :key="`${task.space_id}-${task.id}`"
-                @click="openTaskSheet(task)" class="px-4 py-3">
-                <div class="d-flex align-center flex-wrap ga-2 mb-1">
-                  <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
-                    <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
-                    {{ task.space_name }}
-                  </span>
-                  <span v-if="task.category" class="d-inline-flex align-center text-caption">
-                    <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
-                      class="mr-1" />
-                    {{ task.category.name }}
-                  </span>
-                </div>
+            <v-card v-show="inactiveExpanded" elevation="0">
+              <v-list class="pa-0" lines="two">
+                <v-list-item v-for="task in inactiveTasks" :key="`${task.space_id}-${task.id}`"
+                  @click="openTaskSheet(task)" class="px-4 py-3">
+                  <div class="d-flex align-center flex-wrap ga-2 mb-1">
+                    <span v-if="spacesStore.spaces.length > 1" class="d-inline-flex align-center text-caption">
+                      <v-icon icon="mdi-folder" size="small" class="mr-1" :color="task.space_color || 'grey'" />
+                      {{ task.space_name }}
+                    </span>
+                    <span v-if="task.category" class="d-inline-flex align-center text-caption">
+                      <v-icon :icon="task.category.icon || 'mdi-tag'" :color="task.category.color" size="small"
+                        class="mr-1" />
+                      {{ task.category.name }}
+                    </span>
+                  </div>
 
-                <v-list-item-title class="text-body-1 font-weight-medium">
-                  {{ task.title }}
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-card>
+                  <v-list-item-title class="text-body-1 font-weight-medium">
+                    {{ task.title }}
+                  </v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-card>
           </v-expand-transition>
         </div>
 
@@ -347,118 +377,17 @@
     </v-container>
 
     <!-- Task Action Sheet -->
-    <v-bottom-sheet v-model="taskSheet" scrollable>
-      <v-card v-if="selectedTask">
-        <v-card-title class="d-flex align-center pa-4">
-          <v-icon v-if="selectedTask.category" :color="selectedTask.category.color" :icon="selectedTask.category.icon"
-            class="mr-2" />
-          <span class="text-h6 flex-grow-1">{{ selectedTask.title }}</span>
-          <v-btn icon="mdi-close" variant="text" @click="taskSheet = false" />
-        </v-card-title>
-
-        <!-- Task Details -->
-        <v-card-text class="px-4 pb-2">
-          <div class="d-flex flex-wrap ga-2 mb-3">
-            <v-chip v-if="spacesStore.spaces.length > 1" size="small" variant="outlined">
-              <v-icon icon="mdi-folder" size="small" class="mr-1" :color="selectedTask.space_color || 'grey'" />
-              {{ selectedTask.space_name }}
-            </v-chip>
-            <v-chip v-if="selectedTask.category" size="small" variant="outlined" :color="selectedTask.category.color">
-              <v-icon :icon="selectedTask.category.icon" size="small" class="mr-1" />
-              {{ selectedTask.category.name }}
-            </v-chip>
-            <v-chip size="small" variant="outlined">
-              <v-icon icon="mdi-refresh" size="small" class="mr-1" />
-              {{ getRecurrenceText(selectedTask) }}
-            </v-chip>
-            <v-chip v-if="selectedTask.has_specific_time" size="small" variant="outlined">
-              <v-icon icon="mdi-clock-outline" size="small" class="mr-1" />
-              {{ selectedTask.time_of_day }}
-            </v-chip>
-          </div>
-
-          <p v-if="selectedTask.description" class="text-body-2 text-medium-emphasis">
-            {{ selectedTask.description }}
-          </p>
-        </v-card-text>
-
-        <v-divider />
-
-        <!-- <v-list density="comfortable">
-          <v-list-item @click="completeTaskAndClose">
-            <template #prepend>
-              <v-icon icon="mdi-check-circle" color="success" />
-            </template>
-            <v-list-item-title class="font-weight-medium">Erledigen</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item v-if="selectedTask.recurrence_type !== 'no_date'" @click="skipTaskAndClose">
-            <template #prepend>
-              <v-icon icon="mdi-skip-next" />
-            </template>
-            <v-list-item-title>Überspringen</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item @click="viewOccurrenceGraph">
-            <template #prepend>
-              <v-icon icon="mdi-chart-timeline-variant" />
-            </template>
-            <v-list-item-title>Verlauf anzeigen</v-list-item-title>
-          </v-list-item>
-
-          <v-list-item @click="editTask">
-            <template #prepend>
-              <v-icon icon="mdi-pencil" />
-            </template>
-            <v-list-item-title>Bearbeiten</v-list-item-title>
-          </v-list-item>
-
-          <v-divider />
-
-          <v-list-item @click="deleteTask">
-            <template #prepend>
-              <v-icon icon="mdi-delete" color="error" />
-            </template>
-            <v-list-item-title class="text-error">Löschen</v-list-item-title>
-          </v-list-item>
-        </v-list> -->
-
-        <v-card-actions>
-          <v-spacer />
-          <v-tooltip text="Als erledigt markieren" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-check" color="success" @click="completeTaskAndClose"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip v-if="canSkipTask(selectedTask)" text="Überspringen" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-debug-step-over" @click="skipTaskAndClose"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip v-if="canPostponeTask(selectedTask)" text="Verschieben" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-skip-next" @click="openPostponeSheet"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip text="Statistik" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-chart-timeline-variant" @click="viewOccurrenceGraph"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip text="Bearbeiten" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-pencil" @click="editTask"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-tooltip text="Archivieren" location="top">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-delete" color="error" @click="deleteTask"></v-btn>
-            </template>
-          </v-tooltip>
-          <v-spacer />
-        </v-card-actions>
-      </v-card>
-    </v-bottom-sheet>
+    <TaskActionSheet
+      v-model="taskSheet"
+      :task="selectedTask"
+      :show-space-name="spacesStore.spaces.length > 1"
+      @complete="completeTaskAndClose"
+      @skip="skipTaskAndClose"
+      @postpone="openPostponeSheet"
+      @edit="editTask"
+      @history="viewOccurrenceGraph"
+      @delete="deleteTask"
+    />
 
     <!-- Postpone Bottom Sheet -->
     <v-bottom-sheet v-model="postponeSheet">
@@ -485,38 +414,31 @@
           </div>
 
           <!-- Custom date picker -->
-          <v-text-field
-            v-model="postponeCustomDate"
-            label="Anderes Datum"
-            type="date"
-            variant="outlined"
-            density="compact"
-            hide-details
-          />
+          <v-text-field v-model="postponeCustomDate" label="Anderes Datum" type="date" variant="outlined"
+            density="compact" hide-details />
         </v-card-text>
 
         <v-card-actions>
           <v-btn variant="text" @click="postponeSheet = false">Abbrechen</v-btn>
           <v-spacer />
-          <v-btn
-            variant="text"
-            color="primary"
-            :disabled="!postponeCustomDate"
-            @click="postponeToCustomDate"
-          >
+          <v-btn variant="text" color="primary" :disabled="!postponeCustomDate" @click="postponeToCustomDate">
             Verschieben
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-bottom-sheet>
 
+    <!-- Quick Add Sheet -->
+    <QuickAddSheet v-model="quickAddSheet" :default-space-id="defaultSpaceId" @add-inbox="addToInbox"
+      @open-full="openFullTaskDialog" />
+
     <!-- Task Edit Dialog -->
-    <TaskDialogNew v-model="editDialog" :task="selectedTask" :categories="allCategories" :spaces="spacesStore.spaces"
-      :default-space-id="selectedTask?.space_id" :space-members="[]" @save="saveTask" />
+    <TaskDialog v-model="editDialog" :task="selectedTask" :categories="allCategories" :spaces="spacesStore.spaces"
+      :default-space-id="selectedTask?.space_id" @save="saveTask" />
 
     <!-- Task Create Dialog -->
-    <TaskDialogNew v-model="createDialog" :categories="allCategories" :spaces="spacesStore.spaces"
-      :default-space-id="defaultSpaceId" :space-members="[]" @save="createTask" />
+    <TaskDialog v-model="createDialog" :categories="allCategories" :spaces="spacesStore.spaces"
+      :default-space-id="defaultSpaceId" :initial-title="initialTaskTitle" @save="createTask" />
 
     <!-- Snackbar -->
     <v-snackbar v-model="showSnackbar" :timeout="snackbarTimeout" :color="snackbarColor" location="top">
@@ -536,29 +458,16 @@
         <v-card-text>
           <div v-for="space in spacesStore.spaces" :key="space.id" class="mb-4">
             <div class="d-flex align-center">
-              <v-switch
-                :model-value="selectedSpaceIds.includes(space.id)"
-                @update:model-value="toggleSpaceFilter(space.id)"
-                :label="space.personal_name || space.name"
-                :color="space.personal_color || 'primary'"
-                hide-details
-                density="compact"
-              />
+              <v-switch :model-value="selectedSpaceIds.includes(space.id)"
+                @update:model-value="toggleSpaceFilter(space.id)" :label="space.personal_name || space.name"
+                :color="space.personal_color || 'primary'" hide-details density="compact" />
             </div>
             <v-expand-transition>
               <div v-if="selectedSpaceIds.includes(space.id)" class="ml-8 mt-2">
-                <div
-                  v-for="category in getCategoriesForSpace(space.id)"
-                  :key="category.id"
-                  class="d-flex align-center"
-                >
-                  <v-checkbox
-                    :model-value="selectedCategoryIds.includes(category.id)"
-                    @update:model-value="toggleCategoryFilter(category.id)"
-                    :color="category.color"
-                    hide-details
-                    density="compact"
-                  >
+                <div v-for="category in getCategoriesForSpace(space.id)" :key="category.id" class="d-flex align-center">
+                  <v-checkbox :model-value="selectedCategoryIds.includes(category.id)"
+                    @update:model-value="toggleCategoryFilter(category.id)" :color="category.color" hide-details
+                    density="compact">
                     <template #label>
                       <v-icon :icon="category.icon || 'mdi-tag'" :color="category.color" size="small" class="mr-2" />
                       {{ category.name }}
@@ -588,7 +497,9 @@ import { useRouter } from 'vue-router';
 import { useSpacesStore } from '../stores/spaces.js';
 import { api } from '../composables/useApi.js';
 import { useEventBus } from '../composables/useEventBus.js';
-import TaskDialogNew from '../components/TaskDialogNew.vue';
+import TaskDialog from '../components/TaskDialog.vue';
+import QuickAddSheet from '../components/QuickAddSheet.vue';
+import TaskActionSheet from '../components/TaskActionSheet.vue';
 
 const router = useRouter();
 const spacesStore = useSpacesStore();
@@ -600,6 +511,8 @@ const allCategories = ref([]);
 const taskSheet = ref(false);
 const editDialog = ref(false);
 const createDialog = ref(false);
+const quickAddSheet = ref(false);
+const initialTaskTitle = ref('');
 const filterDialog = ref(false);
 const postponeSheet = ref(false);
 const postponeCustomDate = ref('');
@@ -607,6 +520,7 @@ const selectedTask = ref(null);
 const isOnline = ref(navigator.onLine);
 const upcomingExpanded = ref(false);
 const inactiveExpanded = ref(false);
+const inboxExpanded = ref(true);
 
 const showSnackbar = ref(false);
 const snackbarMessage = ref('');
@@ -725,9 +639,11 @@ function resetFilters() {
   saveCategoryFilter();
 }
 
-// Filtered tasks based on selected spaces and categories (excludes inactive)
+// Filtered tasks based on selected spaces and categories (excludes inactive and completed)
 const filteredTasks = computed(() => {
-  let tasks = allTasks.value.filter(t => t.recurrence_type !== 'inactive');
+  let tasks = allTasks.value.filter(t =>
+    t.status === 'active' && t.task_type !== 'inbox'
+  );
 
   // Filter by space
   if (selectedSpaceIds.value.length > 0) {
@@ -742,9 +658,70 @@ const filteredTasks = computed(() => {
   return tasks;
 });
 
+// Inbox items (NOT filtered by space - inbox is always shown and cannot be filtered out)
+const allInboxItems = computed(() => {
+  return allTasks.value.filter(t => t.task_type === 'inbox' && t.status === 'active');
+});
+
+// Get icon for inbox type
+function getInboxTypeIcon(inboxType) {
+  switch (inboxType) {
+    case 'voice': return 'mdi-microphone';
+    case 'manual': return 'mdi-keyboard';
+    default: return 'mdi-inbox';
+  }
+}
+
+// Get color for inbox type
+function getInboxTypeColor(inboxType) {
+  switch (inboxType) {
+    case 'voice': return 'info';
+    case 'manual': return 'grey';
+    default: return 'grey';
+  }
+}
+
+// Complete inbox item directly
+async function completeInboxItem(task) {
+  try {
+    await api.post(`/spaces/${task.space_id}/tasks/${task.id}/complete`, {});
+    allTasks.value = allTasks.value.filter(t => !(t.space_id === task.space_id && t.id === task.id));
+    snackbarMessage.value = `Erledigt: ${task.title}`;
+    snackbarColor.value = 'success';
+    showSnackbar.value = true;
+  } catch (error) {
+    console.error('Failed to complete inbox item:', error);
+    snackbarMessage.value = 'Fehler beim Erledigen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
+// Enrich inbox item to a full task
+function enrichInboxItem(task) {
+  selectedTask.value = task;
+  editDialog.value = true;
+}
+
+// Delete inbox item
+async function deleteInboxItem(task) {
+  try {
+    await api.delete(`/spaces/${task.space_id}/tasks/${task.id}`);
+    allTasks.value = allTasks.value.filter(t => !(t.space_id === task.space_id && t.id === task.id));
+    snackbarMessage.value = 'Inbox-Eintrag gelöscht';
+    snackbarColor.value = 'success';
+    showSnackbar.value = true;
+  } catch (error) {
+    console.error('Failed to delete inbox item:', error);
+    snackbarMessage.value = 'Fehler beim Löschen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
 // Inactive tasks (filtered by space and category)
 const inactiveTasks = computed(() => {
-  let tasks = allTasks.value.filter(t => t.recurrence_type === 'inactive');
+  let tasks = allTasks.value.filter(t => t.status === 'inactive');
 
   // Filter by space
   if (selectedSpaceIds.value.length > 0) {
@@ -793,8 +770,8 @@ const overdueTasks = computed(() => {
 const todayTasks = computed(() => {
   const today = new Date().toISOString().split('T')[0];
   const tasks = filteredTasks.value.filter(t => {
-    // Include tasks with no date (recurrence_type === 'no_date')
-    if (t.recurrence_type === 'no_date' && !t.is_overdue) return true;
+    // Include floating one_time tasks (no due date)
+    if (t.task_type === 'one_time' && !t.next_due_date && !t.is_overdue) return true;
     // Include tasks due today
     return !t.is_overdue && t.next_due_date === today && !isInTimeSpecificToday(t);
   });
@@ -874,8 +851,44 @@ const defaultCategories = computed(() => {
   return allCategories.value.filter(cat => cat.space_id === defaultSpaceId.value);
 });
 
-// Open create task dialog
+// Open quick add sheet (FAB tap)
 function openCreateTask() {
+  quickAddSheet.value = true;
+}
+
+// Add item to inbox
+async function addToInbox(data) {
+  const spaceId = data.space_id || defaultSpaceId.value;
+  if (!spaceId) {
+    snackbarMessage.value = 'Kein Space verfügbar';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+    return;
+  }
+
+  try {
+    const res = await api.post(`/spaces/${spaceId}/tasks`, {
+      title: data.title,
+      task_type: 'inbox'
+    });
+    await refreshAll();
+
+    snackbarMessage.value = 'Zur Inbox hinzugefügt';
+    snackbarColor.value = 'success';
+    snackbarTimeout.value = 2000;
+    snackbarUndo.value = false;
+    showSnackbar.value = true;
+  } catch (error) {
+    console.error('Failed to add to inbox:', error);
+    snackbarMessage.value = 'Fehler beim Hinzufügen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
+// Open full task dialog (from quick add "More options")
+function openFullTaskDialog(title) {
+  initialTaskTitle.value = title || '';
   createDialog.value = true;
 }
 
@@ -947,14 +960,12 @@ async function completeTask(task) {
 
     const res = await api.post(`/spaces/${task.space_id}/tasks/${task.id}/complete`, {});
 
-    // Remove task if it's one-time or no_date (no next occurrence)
-    // Check if next_due_date is null which means no recurrence
-    const shouldRemove = !res.next_due_date ||
-      res.task?.recurrence_type === 'one_time' ||
-      res.task?.recurrence_type === 'no_date';
+    // Remove task from active list if it's completed (one_time tasks get status='completed')
+    // or if it's an inbox item being processed
+    const shouldRemove = res.task?.status === 'completed' || res.task?.task_type === 'inbox';
 
     if (shouldRemove) {
-      // Task is completed and won't recur, remove it
+      // Task is completed and won't recur, remove it from view
       allTasks.value = allTasks.value.filter(t => !(t.space_id === task.space_id && t.id === task.id));
     } else if (res.task && taskIndex !== -1) {
       // Task has next occurrence, update it
@@ -1000,12 +1011,12 @@ async function skipTaskAndClose() {
 
 // Check if a task can be skipped (only recurring tasks)
 function canSkipTask(task) {
-  return task && ['interval', 'schedule'].includes(task.recurrence_type);
+  return task && task.task_type === 'recurring';
 }
 
-// Check if a task can be postponed (tasks with dates)
+// Check if a task can be postponed (tasks with dates, not inbox)
 function canPostponeTask(task) {
-  return task && ['one_time', 'interval', 'schedule'].includes(task.recurrence_type);
+  return task && task.task_type !== 'inbox' && task.next_due_date;
 }
 
 // Open postpone sheet
@@ -1144,8 +1155,13 @@ function formatDueDate(task) {
 }
 
 function getRecurrenceText(task) {
-  if (task.recurrence_type === 'no_date') return 'Ohne Datum';
-  if (task.recurrence_type === 'one_time') return 'Einmalig';
+  // Handle task_type first
+  if (task.task_type === 'inbox') return 'Inbox';
+  if (task.task_type === 'one_time') {
+    return task.next_due_date ? 'Einmalig' : 'Ohne Datum';
+  }
+
+  // For recurring tasks, show recurrence pattern
   if (task.recurrence_type === 'interval') {
     const days = task.interval_days || 1;
     return `Alle ${days} Tag${days > 1 ? 'e' : ''}`;

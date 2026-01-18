@@ -21,13 +21,25 @@ const routes = [
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: () => import('./views/DashboardEnhanced.vue'),
+    component: () => import('./views/DashboardView.vue'),
+    meta: { auth: true }
+  },
+  {
+    path: '/task-list',
+    name: 'task-list',
+    component: () => import('./views/TaskListView.vue'),
+    meta: { auth: true }
+  },
+  {
+    path: '/calendar',
+    name: 'calendar',
+    component: () => import('./views/CalendarView.vue'),
     meta: { auth: true }
   },
   {
     path: '/spaces',
     name: 'spaces',
-    component: () => import('./views/HomeViewNew.vue'),
+    component: () => import('./views/SpacesView.vue'),
     meta: { auth: true }
   },
   {
@@ -45,7 +57,7 @@ const routes = [
   {
     path: '/settings',
     name: 'settings',
-    component: () => import('./views/SettingsViewNew.vue'),
+    component: () => import('./views/SettingsView.vue'),
     meta: { auth: true }
   }
 ];

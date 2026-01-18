@@ -10,6 +10,15 @@ export default defineConfig(({ mode }) => {
   const certsExist = isDev && fs.existsSync('../../certs/key.pem') && fs.existsSync('../../certs/cert.pem');
 
   return {
+    define: {
+      __BUILD_TIME__: JSON.stringify(new Date().toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }))
+    },
     plugins: [
       vue(),
       vuetify({ autoImport: true }),

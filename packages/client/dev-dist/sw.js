@@ -83,13 +83,13 @@ define(['./workbox-ba5c9bb8'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "index.html",
-    "revision": "0.gsc2gchpkrc"
+    "revision": "0.ih9g734657"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
     allowlist: [/^\/$/]
   }));
-  workbox.registerRoute(/^\/api\//, new workbox.NetworkFirst({
+  workbox.registerRoute(/^https:\/\/tasks\.api\.michoest\.com\/api\//, new workbox.NetworkFirst({
     "cacheName": "api-cache",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 50,

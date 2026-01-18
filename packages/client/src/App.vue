@@ -67,16 +67,20 @@
           <v-icon>mdi-checkbox-multiple-marked-circle-outline</v-icon>
         </v-btn>
 
+        <v-btn value="task-list" @click="router.push('/task-list')">
+          <v-icon>mdi-format-list-checkbox</v-icon>
+        </v-btn>
+
+        <v-btn value="calendar" @click="router.push('/calendar')">
+          <v-icon>mdi-calendar</v-icon>
+        </v-btn>
+
         <v-btn value="history" @click="router.push('/history')">
           <v-icon>mdi-chart-line</v-icon>
         </v-btn>
 
-        <v-btn value="spaces" @click="router.push('/spaces')">
-          <v-icon>mdi-folder-cog</v-icon>
-        </v-btn>
-
         <v-btn value="settings" @click="router.push('/settings')">
-          <v-icon>mdi-account</v-icon>
+          <v-icon>mdi-cog</v-icon>
         </v-btn>
       </v-bottom-navigation>
 
@@ -114,11 +118,13 @@ const isGuestRoute = computed(() => route.meta.guest);
 watch(() => route.path, (path) => {
   if (path === '/dashboard' || path === '/') {
     activeTab.value = 'dashboard';
-  } else if (path === '/spaces' || path.startsWith('/spaces/')) {
-    activeTab.value = 'spaces';
+  } else if (path === '/task-list') {
+    activeTab.value = 'task-list';
+  } else if (path === '/calendar') {
+    activeTab.value = 'calendar';
   } else if (path === '/history') {
     activeTab.value = 'history';
-  } else if (path === '/settings') {
+  } else if (path === '/settings' || path === '/spaces' || path.startsWith('/spaces/')) {
     activeTab.value = 'settings';
   }
 }, { immediate: true });

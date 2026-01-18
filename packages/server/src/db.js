@@ -217,6 +217,93 @@ function migrate() {
     db.pragma('user_version = 3');
     console.log('Migration v3 completed.');
   }
+
+  if (version < 4) {
+    console.log('Running migration v4: Adding task_type, status, and inbox support...');
+
+    db.exec(`
+      -- Add task_type: 'recurring', 'one_time', 'inbox'
+      ALTER TABLE tasks ADD COLUMN task_type TEXT DEFAULT 'recurring';
+
+      -- Add status: 'active', 'inactive', 'completed', 'archived'
+      ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'active';
+
+      -- Add transcript field for inbox items (from voice recordings)
+      ALTER TABLE tasks ADD COLUMN transcript TEXT;
+    `);
+
+    // Migrate existing data based on current recurrence_type
+    // one_time and no_date -> task_type = 'one_time'
+    // inactive -> status = 'inactive' (and task_type stays 'recurring')
+    // everything else -> task_type = 'recurring'
+    db.prepare(`
+      UPDATE tasks SET task_type = 'one_time'
+      WHERE recurrence_type IN ('one_time', 'no_date')
+    `).run();
+
+    db.prepare(`
+      UPDATE tasks SET status = 'inactive'
+      WHERE recurrence_type = 'inactive'
+    `).run();
+
+    // Clean up: change 'inactive' recurrence_type to 'interval' (default)
+    // since status now handles the inactive state
+    db.prepare(`
+      UPDATE tasks SET recurrence_type = 'interval'
+      WHERE recurrence_type = 'inactive'
+    `).run();
+
+    db.pragma('user_version = 4');
+    console.log('Migration v4 completed.');
+  }
+
+  if (version < 5) {
+    console.log('Running migration v5: Adding API key for external integrations...');
+
+    db.exec(`
+      -- Add API key column to users for external integrations (e.g., Apple Shortcuts)
+      ALTER TABLE users ADD COLUMN api_key TEXT;
+      CREATE UNIQUE INDEX idx_users_api_key ON users(api_key);
+    `);
+
+    db.pragma('user_version = 5');
+    console.log('Migration v5 completed.');
+  }
+
+  if (version < 6) {
+    console.log('Running migration v6: Adding inbox_type for inbox item classification...');
+
+    db.exec(`
+      -- Add inbox_type column: 'manual', 'voice', etc.
+      ALTER TABLE tasks ADD COLUMN inbox_type TEXT;
+    `);
+
+    // Update existing inbox items: if transcript is set, it's voice; otherwise manual
+    db.prepare(`
+      UPDATE tasks SET inbox_type = 'voice'
+      WHERE task_type = 'inbox' AND transcript IS NOT NULL
+    `).run();
+
+    db.prepare(`
+      UPDATE tasks SET inbox_type = 'manual'
+      WHERE task_type = 'inbox' AND transcript IS NULL
+    `).run();
+
+    db.pragma('user_version = 6');
+    console.log('Migration v6 completed.');
+  }
+
+  if (version < 7) {
+    console.log('Running migration v7: Adding progress field for tasks...');
+
+    db.exec(`
+      -- Add progress column (0.0 to 1.0, NULL means no progress tracking)
+      ALTER TABLE tasks ADD COLUMN progress REAL;
+    `);
+
+    db.pragma('user_version = 7');
+    console.log('Migration v7 completed.');
+  }
 }
 
 // Seed initial data

@@ -111,7 +111,74 @@ statsRouter.get('/task-occurrences', (req, res) => {
   }
 });
 
-export { statsRouter };
+// Inbox router for external integrations (e.g., Apple Shortcuts)
+const inboxRouter = Router();
+
+// Create inbox item from voice transcript
+// This endpoint uses API key authentication for external access
+inboxRouter.post('/', (req, res) => {
+  try {
+    const { transcript, space_id, api_key } = req.body;
+
+    if (!transcript || !transcript.trim()) {
+      return res.status(400).json({ error: 'Transcript is required' });
+    }
+
+    if (!space_id) {
+      return res.status(400).json({ error: 'space_id is required' });
+    }
+
+    // Authenticate via API key or session
+    let userId;
+    if (api_key) {
+      // Look up user by API key (stored in users table)
+      const user = db.prepare('SELECT id FROM users WHERE api_key = ?').get(api_key);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid API key' });
+      }
+      userId = user.id;
+    } else if (req.session?.userId) {
+      userId = req.session.userId;
+    } else {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Verify user is member of space
+    const membership = db.prepare('SELECT * FROM space_members WHERE space_id = ? AND user_id = ?').get(space_id, userId);
+    if (!membership) {
+      return res.status(403).json({ error: 'Not a member of this space' });
+    }
+
+    // Create inbox item with transcript as title (can be edited later)
+    // Truncate title to first 100 chars, full transcript stored separately
+    const title = transcript.trim().substring(0, 100) + (transcript.length > 100 ? '...' : '');
+
+    const result = db.prepare(`
+      INSERT INTO tasks (
+        space_id, title, transcript,
+        task_type, recurrence_type, status, priority, effort,
+        inbox_type, created_by
+      ) VALUES (?, ?, ?, 'inbox', 'no_date', 'active', 'medium', 'medium', 'voice', ?)
+    `).run(space_id, title, transcript.trim(), userId);
+
+    const task = db.prepare(`
+      SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon
+      FROM tasks t
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE t.id = ?
+    `).get(result.lastInsertRowid);
+
+    // Broadcast to space
+    broadcastToSpace(space_id, 'task_created', task);
+
+    res.json({ task, message: 'Inbox item created successfully' });
+  } catch (error) {
+    console.error('Create inbox item error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export { statsRouter, inboxRouter };
 
 // All routes require authentication
 router.use(requireAuth);
@@ -196,12 +263,31 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    if (!recurrence_type || !['one_time', 'interval', 'schedule', 'inactive', 'no_date'].includes(recurrence_type)) {
-      return res.status(400).json({ error: 'Valid recurrence_type is required' });
+    // Infer task_type from recurrence_type if not provided
+    let taskType = req.body.task_type;
+    if (!taskType) {
+      if (['one_time', 'no_date'].includes(recurrence_type)) {
+        taskType = 'one_time';
+      } else if (['interval', 'schedule'].includes(recurrence_type)) {
+        taskType = 'recurring';
+      } else {
+        taskType = 'recurring'; // default
+      }
     }
 
-    // next_due_date is not required for inactive tasks or no_date tasks
-    if (!['inactive', 'no_date'].includes(recurrence_type) && !next_due_date) {
+    if (!['recurring', 'one_time', 'inbox'].includes(taskType)) {
+      return res.status(400).json({ error: 'Valid task_type is required' });
+    }
+
+    // Validate recurrence_type for recurring tasks
+    if (taskType === 'recurring' && recurrence_type && !['interval', 'schedule'].includes(recurrence_type)) {
+      return res.status(400).json({ error: 'Recurring tasks must use interval or schedule recurrence_type' });
+    }
+
+    // next_due_date is not required for inbox tasks or floating one_time tasks
+    const isFloating = taskType === 'one_time' && !next_due_date;
+    const isInbox = taskType === 'inbox';
+    if (!isFloating && !isInbox && !next_due_date) {
       return res.status(400).json({ error: 'next_due_date is required' });
     }
 
@@ -216,22 +302,38 @@ router.post('/', (req, res) => {
       nextDueDatetime = `${next_due_date}T${time_of_day}:00`;
     }
 
+    // Determine recurrence_type for storage
+    // For one_time tasks: use 'one_time' if has due_date, 'no_date' if floating
+    // For inbox tasks: use 'no_date' (will be converted when processed)
+    // For recurring tasks: use provided recurrence_type
+    let finalRecurrenceType = recurrence_type;
+    if (taskType === 'one_time') {
+      finalRecurrenceType = next_due_date ? 'one_time' : 'no_date';
+    } else if (taskType === 'inbox') {
+      finalRecurrenceType = 'no_date';
+    }
+
+    // Set inbox_type for inbox items
+    const inboxType = taskType === 'inbox' ? (req.body.transcript ? 'voice' : 'manual') : null;
+
     const result = db.prepare(`
       INSERT INTO tasks (
         space_id, category_id, title, description,
         assigned_to, priority, effort,
-        recurrence_type, interval_days, interval_exclude_weekends, schedule_pattern,
+        task_type, status, recurrence_type,
+        interval_days, interval_exclude_weekends, schedule_pattern,
         has_specific_time, time_of_day, grace_period_minutes,
         next_due_date, next_due_datetime,
-        created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        transcript, inbox_type, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       req.spaceId, category_id, title.trim(), description,
       assignedToStr, priority || 'medium', effort || 'medium',
-      recurrence_type, interval_days, interval_exclude_weekends, schedule_pattern,
+      taskType, 'active', finalRecurrenceType,
+      interval_days, interval_exclude_weekends, schedule_pattern,
       has_specific_time ? 1 : 0, time_of_day, grace_period_minutes || 120,
       next_due_date, nextDueDatetime,
-      req.session.userId
+      req.body.transcript || null, inboxType, req.session.userId
     );
 
     const task = db.prepare(`
@@ -259,10 +361,11 @@ router.patch('/:id', (req, res) => {
     const taskId = req.params.id;
     const {
       title, description, category_id, assigned_to,
-      priority, effort,
+      priority, effort, progress,
+      task_type, status,
       recurrence_type, interval_days, interval_exclude_weekends, schedule_pattern,
       has_specific_time, time_of_day, grace_period_minutes,
-      next_due_date
+      next_due_date, transcript
     } = req.body;
 
     // Check if task exists and belongs to space
@@ -301,9 +404,25 @@ router.patch('/:id', (req, res) => {
       updates.push('effort = ?');
       params.push(effort);
     }
+    if (progress !== undefined) {
+      updates.push('progress = ?');
+      params.push(progress);
+    }
+    if (task_type !== undefined) {
+      updates.push('task_type = ?');
+      params.push(task_type);
+    }
+    if (status !== undefined) {
+      updates.push('status = ?');
+      params.push(status);
+    }
     if (recurrence_type !== undefined) {
       updates.push('recurrence_type = ?');
       params.push(recurrence_type);
+    }
+    if (transcript !== undefined) {
+      updates.push('transcript = ?');
+      params.push(transcript);
     }
     if (interval_days !== undefined) {
       updates.push('interval_days = ?');
@@ -393,6 +512,50 @@ router.delete('/:id', (req, res) => {
   }
 });
 
+// Get task stats (7-day history)
+router.get('/:id/stats', (req, res) => {
+  try {
+    const taskId = req.params.id;
+
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND space_id = ?').get(taskId, req.spaceId);
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Get completions for the last 7 days
+    const stats = db.prepare(`
+      SELECT
+        date(completed_at) as date,
+        skipped,
+        completed_by,
+        u.first_name,
+        u.last_name
+      FROM completions c
+      LEFT JOIN users u ON c.completed_by = u.id
+      WHERE c.task_id = ?
+        AND c.completed_at >= date('now', '-7 days')
+      ORDER BY c.completed_at DESC
+    `).all(taskId);
+
+    // Calculate summary
+    const completed = stats.filter(s => !s.skipped).length;
+    const skipped = stats.filter(s => s.skipped).length;
+
+    res.json({
+      stats,
+      summary: {
+        completed,
+        skipped,
+        total: completed + skipped
+      }
+    });
+  } catch (error) {
+    console.error('Get task stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Complete task
 router.post('/:id/complete', (req, res) => {
   try {
@@ -430,6 +593,12 @@ router.post('/:id/complete', (req, res) => {
       nextDueDatetime = `${nextDue}T${task.time_of_day}:00`;
     }
 
+    // For one_time tasks, set status to 'completed' instead of calculating next due
+    const isOneTime = task.task_type === 'one_time';
+    const newStatus = isOneTime ? 'completed' : task.status;
+    const finalNextDue = isOneTime ? null : nextDue;
+    const finalNextDueDatetime = isOneTime ? null : nextDueDatetime;
+
     // Update task
     db.prepare(`
       UPDATE tasks
@@ -437,11 +606,13 @@ router.post('/:id/complete', (req, res) => {
           last_completed_by = ?,
           next_due_date = ?,
           next_due_datetime = ?,
+          status = ?,
           updated_at = ?
       WHERE id = ?
     `).run(
       now.toISOString(), req.session.userId,
-      nextDue, nextDueDatetime,
+      finalNextDue, finalNextDueDatetime,
+      newStatus,
       now.toISOString(), taskId
     );
 

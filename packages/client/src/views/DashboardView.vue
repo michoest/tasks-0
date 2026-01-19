@@ -371,7 +371,7 @@
 
       <!-- Add Task FAB -->
       <v-btn icon="mdi-plus" color="primary" size="large" position="fixed" location="bottom end" class="mb-16 me-4"
-        @click="openCreateTask" />
+        @pointerdown.prevent="openCreateTask" @touchstart.prevent="openCreateTask" />
     </v-container>
 
     <!-- Task Action Sheet -->
@@ -427,15 +427,15 @@
     </v-bottom-sheet>
 
     <!-- Quick Add Sheet -->
-    <QuickAddSheet v-model="quickAddSheet" :default-space-id="defaultSpaceId" @add-inbox="addToInbox"
+    <QuickAddSheet ref="quickAddRef" v-model="quickAddSheet" :default-space-id="defaultSpaceId" @add-inbox="addToInbox"
       @open-full="openFullTaskDialog" />
 
     <!-- Task Edit Dialog -->
-    <TaskDialog v-model="editDialog" :task="selectedTask" :categories="allCategories" :spaces="spacesStore.spaces"
+    <TaskDialog ref="editDialogRef" v-model="editDialog" :task="selectedTask" :categories="allCategories" :spaces="spacesStore.spaces"
       :default-space-id="selectedTask?.space_id" @save="saveTask" />
 
     <!-- Task Create Dialog -->
-    <TaskDialog v-model="createDialog" :categories="allCategories" :spaces="spacesStore.spaces"
+    <TaskDialog ref="createDialogRef" v-model="createDialog" :categories="allCategories" :spaces="spacesStore.spaces"
       :default-space-id="defaultSpaceId" :initial-title="initialTaskTitle" @save="createTask" />
 
     <!-- Snackbar -->
@@ -510,6 +510,11 @@ const taskSheet = ref(false);
 const editDialog = ref(false);
 const createDialog = ref(false);
 const quickAddSheet = ref(false);
+
+// Refs for dialog components (for iOS keyboard focus)
+const quickAddRef = ref(null);
+const editDialogRef = ref(null);
+const createDialogRef = ref(null);
 const initialTaskTitle = ref('');
 const filterDialog = ref(false);
 const postponeSheet = ref(false);
@@ -706,6 +711,8 @@ async function completeInboxItem(task) {
 function enrichInboxItem(task) {
   selectedTask.value = task;
   editDialog.value = true;
+  // Sync focus for iOS keyboard
+  editDialogRef.value?.focusInputNow?.();
 }
 
 // Delete inbox item
@@ -859,6 +866,8 @@ const defaultCategories = computed(() => {
 // Open quick add sheet (FAB tap)
 function openCreateTask() {
   quickAddSheet.value = true;
+  // Sync focus for iOS keyboard
+  quickAddRef.value?.focusInputNow?.();
 }
 
 // Add item to inbox
@@ -895,6 +904,8 @@ async function addToInbox(data) {
 function openFullTaskDialog(title) {
   initialTaskTitle.value = title || '';
   createDialog.value = true;
+  // Sync focus for iOS keyboard
+  createDialogRef.value?.focusInputNow?.();
 }
 
 onMounted(async () => {
@@ -1091,6 +1102,8 @@ async function postponeTask(params) {
 function editTask() {
   taskSheet.value = false;
   editDialog.value = true;
+  // Sync focus for iOS keyboard
+  editDialogRef.value?.focusInputNow?.();
 }
 
 async function saveTask(data) {

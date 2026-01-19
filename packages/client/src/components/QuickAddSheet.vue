@@ -1,5 +1,5 @@
 <template>
-  <v-bottom-sheet :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)">
+  <v-bottom-sheet eager :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)">
     <v-card class="quick-add-card">
       <div class="quick-add-content">
         <v-text-field
@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref } from 'vue';
 
 const props = defineProps({
   modelValue: {
@@ -56,11 +56,13 @@ const emit = defineEmits(['update:modelValue', 'add-inbox', 'open-full']);
 const inputRef = ref(null);
 const title = ref('');
 
-// Focus input when opened
-watch(() => props.modelValue, async (isOpen) => {
-  if (isOpen) {
-    await nextTick();
-    inputRef.value?.focus();
+// Expose method for synchronous focus (for iOS keyboard)
+defineExpose({
+  focusInputNow() {
+    inputRef.value?.focus?.();
+    // Fallback: focus the real input element
+    const el = inputRef.value?.$el?.querySelector?.('input,textarea');
+    el?.focus({ preventScroll: true });
   }
 });
 

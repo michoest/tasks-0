@@ -1,5 +1,5 @@
 <template>
-  <v-bottom-sheet :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" scrollable>
+  <v-bottom-sheet eager :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" scrollable>
     <v-card class="task-dialog-card">
       <!-- Header with title and close button on same line -->
       <div class="sheet-header">
@@ -253,6 +253,17 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'save']);
 
 const titleRef = ref(null);
+
+// Expose method for synchronous focus (for iOS keyboard)
+defineExpose({
+  focusInputNow() {
+    titleRef.value?.focus?.();
+    // Fallback: focus the real input element
+    const el = titleRef.value?.$el?.querySelector?.('input,textarea');
+    el?.focus({ preventScroll: true });
+  }
+});
+
 const showSpace = ref(false);
 const showCategories = ref(false);
 const showRecurrence = ref(false);

@@ -105,12 +105,14 @@
         position="fixed"
         location="bottom end"
         class="mb-16 me-4"
-        @click="openQuickAdd"
+        @pointerdown.prevent="openQuickAdd"
+        @touchstart.prevent="openQuickAdd"
       />
     </v-container>
 
     <!-- Quick Add Sheet -->
     <QuickAddSheet
+      ref="quickAddRef"
       v-model="quickAddSheet"
       :default-space-id="selectedSpaceId"
       @add-inbox="addToInbox"
@@ -119,6 +121,7 @@
 
     <!-- Task Dialog -->
     <TaskDialog
+      ref="taskDialogRef"
       v-model="taskDialog"
       :task="editingTask"
       :categories="categories"
@@ -171,6 +174,10 @@ const taskSheet = ref(false);
 const selectedTask = ref(null);
 const editingTask = ref(null);
 const initialTitle = ref('');
+
+// Refs for dialog components (for iOS keyboard focus)
+const quickAddRef = ref(null);
+const taskDialogRef = ref(null);
 
 // Snackbar
 const showSnackbar = ref(false);
@@ -256,12 +263,16 @@ async function loadData() {
 
 function openQuickAdd() {
   quickAddSheet.value = true;
+  // Sync focus for iOS keyboard
+  quickAddRef.value?.focusInputNow?.();
 }
 
 function openFullTaskDialog(title) {
   initialTitle.value = title || '';
   editingTask.value = null;
   taskDialog.value = true;
+  // Sync focus for iOS keyboard
+  taskDialogRef.value?.focusInputNow?.();
 }
 
 async function addToInbox(data) {
@@ -339,6 +350,8 @@ function editTask() {
   initialTitle.value = '';
   taskSheet.value = false;
   taskDialog.value = true;
+  // Sync focus for iOS keyboard
+  taskDialogRef.value?.focusInputNow?.();
 }
 
 async function deleteTask() {

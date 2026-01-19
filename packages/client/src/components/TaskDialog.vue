@@ -38,6 +38,14 @@
         <div class="option-pill" :class="{ 'option-active': showNotes }" @click="showNotes = !showNotes">
           <v-icon size="16">mdi-note-text-outline</v-icon>
         </div>
+
+        <!-- Active/Inactive Toggle (only when editing) -->
+        <div v-if="task" class="option-pill" :class="{ 'option-inactive': formData.status === 'inactive' }" @click="toggleStatus">
+          <v-icon size="16" :color="formData.status === 'inactive' ? 'warning' : 'success'">
+            {{ formData.status === 'inactive' ? 'mdi-pause-circle' : 'mdi-play-circle' }}
+          </v-icon>
+          <span class="option-label">{{ formData.status === 'inactive' ? 'Inaktiv' : 'Aktiv' }}</span>
+        </div>
       </div>
 
       <!-- Expandable Sections -->
@@ -274,7 +282,8 @@ function getDefaultFormData() {
     has_specific_time: false,
     time_of_day: '09:00',
     next_due_date: getTodayDate(),
-    progress: null
+    progress: null,
+    status: 'active'
   };
 }
 
@@ -309,6 +318,10 @@ function toggleProgress() {
 function removeProgress() {
   formData.value.progress = null;
   showProgress.value = false;
+}
+
+function toggleStatus() {
+  formData.value.status = formData.value.status === 'active' ? 'inactive' : 'active';
 }
 
 function selectSpace(spaceId) {
@@ -386,13 +399,19 @@ function getDateLabel() {
 }
 
 function formatShortDate(dateStr) {
-  const date = new Date(dateStr);
+  // Parse as local date (not UTC) by splitting the date string
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  if (dateStr === today.toISOString().split('T')[0]) return 'Heute';
-  if (dateStr === tomorrow.toISOString().split('T')[0]) return 'Morgen';
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+  if (dateStr === todayStr) return 'Heute';
+  if (dateStr === tomorrowStr) return 'Morgen';
 
   const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   return `${days[date.getDay()]}, ${date.getDate()}.${date.getMonth() + 1}.`;
@@ -467,7 +486,8 @@ function loadTask(task) {
     has_specific_time: !!task.has_specific_time,
     time_of_day: task.time_of_day || '09:00',
     next_due_date: task.next_due_date || getTodayDate(),
-    progress: task.progress !== undefined ? task.progress : null
+    progress: task.progress !== undefined ? task.progress : null,
+    status: task.status || 'active'
   };
 
   if (task.schedule_pattern) {
@@ -532,7 +552,8 @@ function save() {
     recurrence_type: formData.value.recurrence_type,
     has_specific_time: formData.value.has_specific_time ? 1 : 0,
     time_of_day: formData.value.has_specific_time ? formData.value.time_of_day : null,
-    progress: formData.value.progress
+    progress: formData.value.progress,
+    status: formData.value.status
   };
 
   if (formData.value.recurrence_type === 'no_date') {
@@ -629,6 +650,10 @@ function save() {
 
 .option-active {
   background: #e3f2fd;
+}
+
+.option-inactive {
+  background: #fff3e0;
 }
 
 .option-label {

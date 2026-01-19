@@ -19,9 +19,7 @@
               {{ space.personal_name || space.name }}
             </v-chip>
             <v-spacer />
-            <v-badge :model-value="hasActiveFilters" dot color="primary" offset-x="-2" offset-y="-2">
-              <v-btn icon="mdi-filter-variant" size="small" variant="text" @click="filterDialog = true" />
-            </v-badge>
+            <v-btn icon="mdi-filter-variant" size="small" variant="text" :color="hasActiveFilters ? 'error' : undefined" @click="filterDialog = true" />
           </div>
         </div>
         <!-- Inbox Items (always visible, collapsible, not filterable) -->
@@ -518,9 +516,11 @@ const postponeSheet = ref(false);
 const postponeCustomDate = ref('');
 const selectedTask = ref(null);
 const isOnline = ref(navigator.onLine);
-const upcomingExpanded = ref(false);
-const inactiveExpanded = ref(false);
-const inboxExpanded = ref(true);
+
+// Load expansion states from localStorage (default: inbox expanded, others collapsed)
+const upcomingExpanded = ref(localStorage.getItem('dashboard-upcoming-expanded') === 'true');
+const inactiveExpanded = ref(localStorage.getItem('dashboard-inactive-expanded') === 'true');
+const inboxExpanded = ref(localStorage.getItem('dashboard-inbox-expanded') !== 'false'); // Default true
 
 const showSnackbar = ref(false);
 const snackbarMessage = ref('');
@@ -576,6 +576,11 @@ function toggleSpaceFilter(spaceId) {
 
 // Watch for changes to persist
 watch(selectedSpaceIds, saveSpaceFilter, { deep: true });
+
+// Persist expansion states
+watch(upcomingExpanded, (val) => localStorage.setItem('dashboard-upcoming-expanded', val));
+watch(inactiveExpanded, (val) => localStorage.setItem('dashboard-inactive-expanded', val));
+watch(inboxExpanded, (val) => localStorage.setItem('dashboard-inbox-expanded', val));
 
 // Load category filter from localStorage
 function loadCategoryFilter() {
@@ -1029,7 +1034,9 @@ function openPostponeSheet() {
 // Format date for postpone display
 function formatPostponeDate(dateStr) {
   if (!dateStr) return 'Kein Datum';
-  const date = new Date(dateStr);
+  // Parse as local date (not UTC) by splitting the date string
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
   return `${dayNames[date.getDay()]}, ${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
 }
@@ -1149,7 +1156,9 @@ async function createTask(data) {
 
 function formatDueDate(task) {
   if (!task.next_due_date) return '';
-  const date = new Date(task.next_due_date);
+  // Parse as local date (not UTC) by splitting the date string
+  const [year, month, day] = task.next_due_date.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   return `${dayNames[date.getDay()]}, ${date.getDate()}.${date.getMonth() + 1}.`;
 }

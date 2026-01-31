@@ -33,7 +33,7 @@ router.get('/', (req, res) => {
     const categories = db.prepare(`
       SELECT * FROM categories
       WHERE space_id = ?
-      ORDER BY position ASC
+      ORDER BY position ASC, id ASC
     `).all(req.spaceId);
 
     res.json({ categories });

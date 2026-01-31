@@ -304,6 +304,29 @@ function migrate() {
     db.pragma('user_version = 7');
     console.log('Migration v7 completed.');
   }
+
+  if (version < 8) {
+    console.log('Running migration v8: Fixing category positions for insertion order...');
+
+    // Get all spaces
+    const spaces = db.prepare('SELECT id FROM spaces').all();
+
+    for (const space of spaces) {
+      // Get categories for this space ordered by id (insertion order)
+      const categories = db.prepare(
+        'SELECT id FROM categories WHERE space_id = ? ORDER BY id ASC'
+      ).all(space.id);
+
+      // Update positions based on insertion order
+      const updateStmt = db.prepare('UPDATE categories SET position = ? WHERE id = ?');
+      categories.forEach((cat, index) => {
+        updateStmt.run(index, cat.id);
+      });
+    }
+
+    db.pragma('user_version = 8');
+    console.log('Migration v8 completed.');
+  }
 }
 
 // Seed initial data

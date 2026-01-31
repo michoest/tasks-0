@@ -82,7 +82,12 @@ async function handleLogin() {
 
   try {
     await authStore.login(email.value, password.value);
-    router.push('/');
+    // Use replace to avoid login page in history, and await to ensure navigation completes
+    const result = await router.replace('/');
+    // If navigation failed (redirected or aborted), force a page reload
+    if (result) {
+      window.location.href = '/';
+    }
   } catch (err) {
     error.value = err.message || 'Anmeldung fehlgeschlagen';
   } finally {

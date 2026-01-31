@@ -593,11 +593,11 @@ router.post('/:id/complete', (req, res) => {
       nextDueDatetime = `${nextDue}T${task.time_of_day}:00`;
     }
 
-    // For one_time tasks, set status to 'completed' instead of calculating next due
-    const isOneTime = task.task_type === 'one_time';
-    const newStatus = isOneTime ? 'completed' : task.status;
-    const finalNextDue = isOneTime ? null : nextDue;
-    const finalNextDueDatetime = isOneTime ? null : nextDueDatetime;
+    // For one_time and inbox tasks, set status to 'completed' instead of calculating next due
+    const isNonRecurring = task.task_type === 'one_time' || task.task_type === 'inbox';
+    const newStatus = isNonRecurring ? 'completed' : task.status;
+    const finalNextDue = isNonRecurring ? null : nextDue;
+    const finalNextDueDatetime = isNonRecurring ? null : nextDueDatetime;
 
     // Update task
     db.prepare(`

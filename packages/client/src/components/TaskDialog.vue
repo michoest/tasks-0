@@ -88,7 +88,7 @@
             <div class="pill-grid mb-3">
               <div class="selectable-pill" :class="{ 'pill-selected': formData.recurrence_type === 'no_date' }"
                 @click="formData.recurrence_type = 'no_date'">
-                <v-icon size="16">mdi-infinity</v-icon>
+                <v-icon size="16">mdi-calendar-question</v-icon>
                 <span>Irgendwann</span>
               </div>
               <div class="selectable-pill" :class="{ 'pill-selected': formData.recurrence_type === 'one_time' }"
@@ -247,7 +247,8 @@ const props = defineProps({
   categories: { type: Array, default: () => [] },
   spaces: { type: Array, default: () => [] },
   defaultSpaceId: Number,
-  initialTitle: { type: String, default: '' }
+  initialTitle: { type: String, default: '' },
+  initialCategoryId: { type: Number, default: null }
 });
 
 const emit = defineEmits(['update:modelValue', 'save']);
@@ -374,7 +375,7 @@ function getCategoryIcon() {
 
 function getDateIcon() {
   switch (formData.value.recurrence_type) {
-    case 'no_date': return 'mdi-infinity';
+    case 'no_date': return 'mdi-calendar-question';
     case 'one_time': return 'mdi-calendar';
     case 'interval': return 'mdi-refresh';
     case 'schedule': return 'mdi-calendar-clock';
@@ -467,6 +468,7 @@ watch(() => props.modelValue, (isOpen) => {
     } else {
       formData.value = getDefaultFormData();
       formData.value.title = props.initialTitle || '';
+      formData.value.category_id = props.initialCategoryId || null;
       scheduleWeekdays.value = [];
       scheduleMonthDays.value = [];
       showSpace.value = false;

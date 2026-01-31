@@ -326,7 +326,7 @@
             <!-- Build Info -->
             <v-card variant="flat" class="bg-grey-lighten-4">
               <v-card-text class="text-center text-caption text-medium-emphasis">
-                <div>Build: {{ buildTime }}</div>
+                <div>Build: {{ buildTime }} ({{ buildTimeAgo }})</div>
               </v-card-text>
             </v-card>
           </v-expansion-panel-text>
@@ -432,6 +432,12 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
 import { useSpacesStore } from '../stores/spaces.js';
 import { api } from '../composables/useApi.js';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/de';
+
+dayjs.extend(relativeTime);
+dayjs.locale('de');
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -469,6 +475,8 @@ const apiBaseUrl = computed(() => {
 
 // Build time injected at build
 const buildTime = __BUILD_TIME__;
+const buildTimestamp = __BUILD_TIMESTAMP__;
+const buildTimeAgo = computed(() => dayjs(buildTimestamp).fromNow());
 
 // Push notification debug state
 const pushLoading = ref(false);

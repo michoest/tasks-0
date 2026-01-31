@@ -1,7 +1,11 @@
 <template>
   <v-app>
-    <SplashScreen v-if="authStore.loading" />
-    <template v-else>
+    <!-- Splash screen with fade-out transition -->
+    <Transition name="splash-fade">
+      <SplashScreen v-if="authStore.loading" />
+    </Transition>
+
+    <template v-if="!authStore.loading">
       <!-- Connection Status Bar - Flat gradient bar -->
       <div v-if="authStore.user && !isGuestRoute" class="connection-status-bar" :class="{ 'status-online': isOnline, 'status-offline': !isOnline }"></div>
 
@@ -109,5 +113,14 @@ function refreshDashboard() {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+/* Splash screen fade-out transition */
+.splash-fade-leave-active {
+  transition: opacity 0.3s ease-out;
+}
+
+.splash-fade-leave-to {
+  opacity: 0;
 }
 </style>

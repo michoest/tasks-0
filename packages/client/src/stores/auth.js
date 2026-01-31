@@ -5,10 +5,15 @@ import { api } from '../composables/useApi.js';
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null);
   const checked = ref(false);
-  const loading = ref(true);
+
+  // Check if this is a cold start (first visit in this browser session)
+  const isColdStart = !sessionStorage.getItem('app-session-started');
+  const loading = ref(isColdStart);
 
   async function checkSession() {
     const startTime = Date.now();
+    // Minimum splash time: 800ms for cold start, 0 for warm revisit
+    const minSplashTime = isColdStart ? 800 : 0;
 
     try {
       const res = await api.get('/auth/me');
@@ -16,12 +21,16 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       user.value = null;
     } finally {
-      // Ensure minimum 2 seconds display time for splash screen
-      const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, 2000 - elapsedTime);
+      // Mark session as started for future visits
+      sessionStorage.setItem('app-session-started', 'true');
 
-      if (remainingTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      // Ensure minimum display time for splash (only on cold start)
+      if (isColdStart) {
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, minSplashTime - elapsedTime);
+        if (remainingTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
+        }
       }
 
       checked.value = true;

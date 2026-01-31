@@ -115,7 +115,9 @@ function truncate(str, length) {
 
 .task-checkbox {
   margin-right: 12px;
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  height: 21px; /* Match line-height of task-title (15px * 1.4) */
 }
 
 .task-content {
@@ -186,7 +188,9 @@ function truncate(str, length) {
 
 .task-category {
   margin-left: 12px;
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  height: 21px; /* Match line-height of task-title (15px * 1.4) */
 }
 
 /* Empty State */

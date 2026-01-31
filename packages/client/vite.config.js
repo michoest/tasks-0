@@ -9,15 +9,17 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === 'development';
   const certsExist = isDev && fs.existsSync('../../certs/key.pem') && fs.existsSync('../../certs/cert.pem');
 
+  const buildDate = new Date();
   return {
     define: {
-      __BUILD_TIME__: JSON.stringify(new Date().toLocaleString('de-DE', {
+      __BUILD_TIME__: JSON.stringify(buildDate.toLocaleString('de-DE', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      }))
+      })),
+      __BUILD_TIMESTAMP__: buildDate.getTime()
     },
     plugins: [
       vue(),

@@ -128,6 +128,7 @@
       :spaces="spacesStore.spaces"
       :default-space-id="selectedSpaceId"
       :initial-title="initialTitle"
+      :initial-category-id="editingTask ? null : currentCategoryId"
       @save="saveTask"
     />
 
@@ -188,6 +189,13 @@ const snackbarColor = ref('success');
 const selectedSpace = computed(() =>
   spacesStore.spaces.find(s => s.id === selectedSpaceId.value)
 );
+
+// Get current category ID from tab selection (null if "Alle" is selected)
+const currentCategoryId = computed(() => {
+  if (selectedTabIndex.value === 0) return null;
+  const category = categories.value[selectedTabIndex.value - 1];
+  return category?.id || null;
+});
 
 // Get active tasks sorted
 const activeTasks = computed(() => {
@@ -262,9 +270,12 @@ async function loadData() {
 }
 
 function openQuickAdd() {
-  quickAddSheet.value = true;
+  // Open full task dialog directly with current category pre-selected
+  initialTitle.value = '';
+  editingTask.value = null;
+  taskDialog.value = true;
   // Sync focus for iOS keyboard
-  quickAddRef.value?.focusInputNow?.();
+  taskDialogRef.value?.focusInputNow?.();
 }
 
 function openFullTaskDialog(title) {

@@ -12,6 +12,7 @@ import categoriesRoutes from './routes/categories.js';
 import tasksRoutes, { statsRouter, inboxRouter } from './routes/tasks.js';
 import pushRoutes from './routes/push.js';
 import sseRoutes from './routes/sse.js';
+import dispatchRoutes from './routes/dispatch.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +45,9 @@ app.use('/api/stats', statsRouter);
 app.use('/api/inbox', inboxRouter);
 app.use('/api/push', pushRoutes);
 app.use('/api/sse', sseRoutes);
+
+// Dispatch routes (Voice Dispatcher integration)
+app.use('/dispatch', dispatchRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

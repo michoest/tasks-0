@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => {
           background_color: '#F9FAFB',
           display: 'standalone',
           start_url: '/',
+          scope: '/',
+          id: '/',
           icons: [
             {
               src: '/icon-192.png',

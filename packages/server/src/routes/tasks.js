@@ -459,6 +459,12 @@ router.patch('/:id', (req, res) => {
       }
     }
 
+    // When an inbox item is edited (converted), change its type to one_time
+    if (task.task_type === 'inbox' && task_type === undefined) {
+      updates.push('task_type = ?');
+      params.push('one_time');
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }

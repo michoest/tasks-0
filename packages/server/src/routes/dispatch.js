@@ -32,7 +32,7 @@ router.get('/health', (req, res) => {
 // Service documentation - API key required
 router.get('/docs', requireDispatchApiKey, (req, res) => {
   res.json({
-    service: 'tasks',
+    name: 'tasks',
     description: 'Task management service with inbox, categories, and recurring tasks',
     endpoints: [
       {

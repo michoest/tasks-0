@@ -389,7 +389,7 @@
 
     <!-- Postpone Bottom Sheet -->
     <v-bottom-sheet v-model="postponeSheet">
-      <v-card v-if="selectedTask">
+      <v-card v-if="selectedTask" @keydown.enter="postponeCustomDate && postponeToCustomDate()">
         <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-calendar-clock" class="mr-2" />
           <span>Verschieben</span>
@@ -1025,12 +1025,12 @@ async function skipTaskAndClose() {
   }
 }
 
-// Check if a task can be skipped (only recurring tasks)
+// Check if a task can be skipped (only schedule-based recurring tasks)
 function canSkipTask(task) {
-  return task && task.task_type === 'recurring';
+  return task && task.task_type === 'recurring' && task.recurrence_type === 'schedule';
 }
 
-// Check if a task can be postponed (tasks with dates, not inbox)
+// Check if a task can be postponed (tasks with dates, not inbox; includes interval-based recurring tasks)
 function canPostponeTask(task) {
   return task && task.task_type !== 'inbox' && task.next_due_date;
 }

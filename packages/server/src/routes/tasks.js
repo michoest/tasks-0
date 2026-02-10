@@ -82,7 +82,7 @@ statsRouter.get('/task-occurrences', (req, res) => {
       JOIN spaces s ON t.space_id = s.id
       LEFT JOIN categories c ON t.category_id = c.id
       WHERE t.space_id IN (${placeholders})
-        AND t.recurrence_type NOT IN ('inactive', 'one_time')
+        AND t.task_type = 'recurring'
       ORDER BY t.title
     `).all(...spaceIds);
 

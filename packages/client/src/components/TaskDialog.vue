@@ -1,6 +1,6 @@
 <template>
   <v-bottom-sheet eager :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" scrollable>
-    <v-card class="task-dialog-card">
+    <v-card class="task-dialog-card" @keydown.enter="handleEnterKey">
       <!-- Header with title and close button on same line -->
       <div class="sheet-header">
         <v-text-field ref="titleRef" v-model="formData.title" placeholder="Aufgabe..." variant="plain"
@@ -552,6 +552,12 @@ function calculateScheduleNextDue(pattern) {
   }
 
   return today.toISOString().split('T')[0];
+}
+
+function handleEnterKey(event) {
+  // Don't trigger save when in a textarea
+  if (event.target.tagName === 'TEXTAREA') return;
+  save();
 }
 
 function save() {

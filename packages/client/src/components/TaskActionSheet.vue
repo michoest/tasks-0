@@ -201,12 +201,14 @@ function getDayTooltip(day) {
 
 const canSkip = computed(() => {
   if (!props.task) return false;
-  return props.task.task_type === 'recurring';
+  return props.task.task_type === 'recurring' && props.task.recurrence_type === 'schedule';
 });
 
 const canPostpone = computed(() => {
   if (!props.task) return false;
-  return props.task.recurrence_type === 'one_time' && props.task.next_due_date;
+  if (props.task.recurrence_type === 'one_time' && props.task.next_due_date) return true;
+  if (props.task.task_type === 'recurring' && props.task.recurrence_type === 'interval') return true;
+  return false;
 });
 
 function formatDate(dateStr) {

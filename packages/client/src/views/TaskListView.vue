@@ -65,6 +65,18 @@
         </v-tabs>
       </div>
 
+      <!-- Active Timer Card -->
+      <v-card v-if="activeTimer" color="blue" variant="tonal" class="mx-4 mt-3" @click="openTimerTask">
+        <v-card-text class="d-flex align-center py-3">
+          <v-icon icon="mdi-timer" color="blue" class="mr-3" />
+          <div class="flex-grow-1">
+            <div class="text-body-2 font-weight-medium">{{ activeTimer.task_title }}</div>
+            <div class="text-caption text-blue">{{ formatElapsed(timerElapsed) }}</div>
+          </div>
+          <v-btn icon="mdi-stop" color="blue" variant="text" size="small" @click.stop="stopActiveTimer" />
+        </v-card-text>
+      </v-card>
+
       <!-- Loading -->
       <div v-if="loading" class="text-center py-8">
         <v-progress-circular indeterminate color="primary" />
@@ -138,10 +150,81 @@
       :task="selectedTask"
       :show-space-name="false"
       :show-history="false"
+      :available-tasks="availableTasksForSheet"
       @complete="completeTaskAndClose"
       @edit="editTask"
       @delete="deleteTask"
+      @wait="openWaitSheet"
+      @timer-start="startTimer"
+      @timer-stop="stopTimer"
+      @items-changed="loadData"
     />
+
+    <!-- Wait Bottom Sheet -->
+    <v-bottom-sheet v-model="waitSheet">
+      <v-card v-if="selectedTask" @keydown.enter="submitWait">
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-clock-alert-outline" color="orange" class="mr-2" />
+          <span>Warten</span>
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" @click="waitSheet = false" />
+        </v-card-title>
+
+        <v-card-text>
+          <v-btn-toggle v-model="waitTab" mandatory class="mb-4" density="compact" variant="outlined" divided>
+            <v-btn value="task">
+              <v-icon icon="mdi-link-variant" class="mr-1" size="small" />
+              Aufgabe
+            </v-btn>
+            <v-btn value="contact">
+              <v-icon icon="mdi-account" class="mr-1" size="small" />
+              Person
+            </v-btn>
+          </v-btn-toggle>
+
+          <div v-if="waitTab === 'task'">
+            <v-autocomplete
+              v-model="waitBlockerTaskId"
+              :items="availableTasksForSheet"
+              item-title="title"
+              item-value="id"
+              label="Blockiert durch..."
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </div>
+
+          <div v-if="waitTab === 'contact'">
+            <v-text-field
+              v-model="waitContactName"
+              label="Name der Person"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="mb-3"
+            />
+            <v-text-field
+              v-model="waitReminderDate"
+              label="Erinnerung am"
+              type="date"
+              variant="outlined"
+              density="compact"
+              hide-details
+            />
+          </div>
+        </v-card-text>
+
+        <v-card-actions>
+          <v-btn variant="text" @click="waitSheet = false">Abbrechen</v-btn>
+          <v-spacer />
+          <v-btn variant="text" color="orange" :disabled="!canSubmitWait" @click="submitWait">
+            Speichern
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-bottom-sheet>
 
     <!-- Snackbar -->
     <v-snackbar v-model="showSnackbar" :timeout="2000" :color="snackbarColor" location="top">
@@ -151,7 +234,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useSpacesStore } from '../stores/spaces.js';
 import { api } from '../composables/useApi.js';
 import TaskDialog from '../components/TaskDialog.vue';
@@ -180,6 +263,18 @@ const initialTitle = ref('');
 const quickAddRef = ref(null);
 const taskDialogRef = ref(null);
 
+// Wait sheet
+const waitSheet = ref(false);
+const waitTab = ref('task');
+const waitBlockerTaskId = ref(null);
+const waitContactName = ref('');
+const waitReminderDate = ref('');
+
+// Active timer
+const activeTimer = ref(null);
+const timerElapsed = ref(0);
+let timerInterval = null;
+
 // Snackbar
 const showSnackbar = ref(false);
 const snackbarMessage = ref('');
@@ -195,6 +290,23 @@ const currentCategoryId = computed(() => {
   if (selectedTabIndex.value === 0) return null;
   const category = categories.value[selectedTabIndex.value - 1];
   return category?.id || null;
+});
+
+// Available tasks for the wait sheet and action sheet
+const availableTasksForSheet = computed(() => {
+  if (!selectedTask.value) return [];
+  return tasks.value.filter(t =>
+    t.id !== selectedTask.value.id &&
+    t.status === 'active' &&
+    t.task_type !== 'inbox'
+  );
+});
+
+// Can submit wait form
+const canSubmitWait = computed(() => {
+  if (waitTab.value === 'task') return !!waitBlockerTaskId.value;
+  if (waitTab.value === 'contact') return !!waitContactName.value;
+  return false;
 });
 
 // Get active tasks sorted
@@ -383,6 +495,143 @@ async function deleteTask() {
   }
 }
 
+// --- Active Timer ---
+
+async function fetchActiveTimer() {
+  try {
+    const res = await api.get('/timer/active');
+    activeTimer.value = res.timer || null;
+    if (activeTimer.value) {
+      startTimerTick();
+    } else {
+      stopTimerTick();
+    }
+  } catch (error) {
+    activeTimer.value = null;
+  }
+}
+
+function startTimerTick() {
+  stopTimerTick();
+  if (activeTimer.value) {
+    const started = new Date(activeTimer.value.started_at);
+    timerElapsed.value = Math.floor((Date.now() - started.getTime()) / 1000);
+    timerInterval = setInterval(() => {
+      timerElapsed.value = Math.floor((Date.now() - started.getTime()) / 1000);
+    }, 1000);
+  }
+}
+
+function stopTimerTick() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  timerElapsed.value = 0;
+}
+
+function formatElapsed(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function openTimerTask() {
+  if (!activeTimer.value) return;
+  const task = tasks.value.find(t => t.id === activeTimer.value.task_id);
+  if (task) openTaskSheet(task);
+}
+
+async function stopActiveTimer() {
+  if (!activeTimer.value) return;
+  try {
+    await api.post(`/spaces/${activeTimer.value.space_id}/tasks/${activeTimer.value.task_id}/timer/stop`);
+    stopTimerTick();
+    activeTimer.value = null;
+    await loadData();
+  } catch (error) {
+    console.error('Failed to stop timer:', error);
+    snackbarMessage.value = 'Fehler beim Stoppen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
+async function startTimer() {
+  if (!selectedTask.value) return;
+  try {
+    await api.post(`/spaces/${selectedSpaceId.value}/tasks/${selectedTask.value.id}/timer/start`);
+    await fetchActiveTimer();
+    await loadData();
+  } catch (error) {
+    console.error('Failed to start timer:', error);
+    snackbarMessage.value = 'Fehler beim Starten';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
+async function stopTimer() {
+  if (!selectedTask.value) return;
+  try {
+    await api.post(`/spaces/${selectedSpaceId.value}/tasks/${selectedTask.value.id}/timer/stop`);
+    stopTimerTick();
+    activeTimer.value = null;
+    await loadData();
+  } catch (error) {
+    console.error('Failed to stop timer:', error);
+    snackbarMessage.value = 'Fehler beim Stoppen';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
+// --- Wait Sheet ---
+
+function openWaitSheet() {
+  taskSheet.value = false;
+  waitTab.value = 'task';
+  waitBlockerTaskId.value = null;
+  waitContactName.value = '';
+  waitReminderDate.value = '';
+  waitSheet.value = true;
+}
+
+async function submitWait() {
+  if (!canSubmitWait.value || !selectedTask.value) return;
+
+  try {
+    if (waitTab.value === 'task') {
+      await api.post(`/spaces/${selectedSpaceId.value}/tasks/${selectedTask.value.id}/items`, {
+        item_type: 'task',
+        value: '',
+        referenced_task_id: waitBlockerTaskId.value,
+        relationship: 'blocked_by'
+      });
+    } else {
+      await api.post(`/spaces/${selectedSpaceId.value}/tasks/${selectedTask.value.id}/items`, {
+        item_type: 'contact',
+        value: waitContactName.value,
+        waiting: 1,
+        reminder_date: waitReminderDate.value || null
+      });
+    }
+
+    waitSheet.value = false;
+    await loadData();
+    snackbarMessage.value = 'Aufgabe wartet';
+    snackbarColor.value = 'orange';
+    showSnackbar.value = true;
+  } catch (error) {
+    console.error('Failed to set wait:', error);
+    snackbarMessage.value = error.response?.data?.error || 'Fehler beim Speichern';
+    snackbarColor.value = 'error';
+    showSnackbar.value = true;
+  }
+}
+
 // Initialize
 onMounted(async () => {
   await spacesStore.fetchSpaces();
@@ -398,6 +647,7 @@ onMounted(async () => {
   }
 
   await loadData();
+  await fetchActiveTimer();
 
   // Restore category tab after loading data (so we can validate against available categories)
   if (savedCategory) {
@@ -407,6 +657,10 @@ onMounted(async () => {
       selectedTabIndex.value = catIndex + 1; // +1 because "Alle" is at index 0
     }
   }
+});
+
+onUnmounted(() => {
+  stopTimerTick();
 });
 </script>
 

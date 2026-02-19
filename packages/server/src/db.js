@@ -327,6 +327,55 @@ function migrate() {
     db.pragma('user_version = 8');
     console.log('Migration v8 completed.');
   }
+
+  if (version < 9) {
+    console.log('Running migration v9: Adding task items, time entries, and waiting support...');
+
+    db.exec(`
+      -- Structured items attached to tasks
+      CREATE TABLE task_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        item_type TEXT NOT NULL,
+        value TEXT NOT NULL,
+        label TEXT,
+        referenced_task_id INTEGER,
+        relationship TEXT,
+        waiting INTEGER DEFAULT 0,
+        reminder_date TEXT,
+        position INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (referenced_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX idx_task_items_task ON task_items(task_id);
+      CREATE INDEX idx_task_items_referenced ON task_items(referenced_task_id)
+        WHERE referenced_task_id IS NOT NULL;
+
+      -- Time tracking entries
+      CREATE TABLE time_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        duration_seconds INTEGER,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_time_entries_task ON time_entries(task_id);
+      CREATE INDEX idx_time_entries_active ON time_entries(user_id)
+        WHERE ended_at IS NULL;
+
+      -- Waiting support on tasks
+      ALTER TABLE tasks ADD COLUMN waiting_until TEXT;
+    `);
+
+    db.pragma('user_version = 9');
+    console.log('Migration v9 completed.');
+  }
 }
 
 // Seed initial data

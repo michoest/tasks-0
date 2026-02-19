@@ -916,8 +916,11 @@ router.post('/:id/items', (req, res) => {
 
     const { item_type, value, label, referenced_task_id, relationship, waiting, reminder_date } = req.body;
 
-    if (!item_type || !value) {
-      return res.status(400).json({ error: 'item_type and value are required' });
+    if (!item_type) {
+      return res.status(400).json({ error: 'item_type is required' });
+    }
+    if (!value && item_type !== 'task') {
+      return res.status(400).json({ error: 'value is required' });
     }
 
     if (!['phone', 'email', 'url', 'task', 'contact'].includes(item_type)) {

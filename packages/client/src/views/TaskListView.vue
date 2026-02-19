@@ -604,9 +604,10 @@ async function submitWait() {
 
   try {
     if (waitTab.value === 'task') {
+      const blockerTask = availableTasksForSheet.value.find(t => t.id === waitBlockerTaskId.value);
       await api.post(`/spaces/${selectedSpaceId.value}/tasks/${selectedTask.value.id}/items`, {
         item_type: 'task',
-        value: '',
+        value: blockerTask?.title || '',
         referenced_task_id: waitBlockerTaskId.value,
         relationship: 'blocked_by'
       });
